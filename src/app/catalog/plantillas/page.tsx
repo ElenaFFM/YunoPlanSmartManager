@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useIdentity } from "../identity-provider";
 import {
   type Bank,
+  type CatalogStatus,
   type Template,
   type TemplateRange,
   CatalogApiError,
   createTemplate,
+  createTemplateVersion,
   listBanks,
   listTemplates,
+  updateTemplate,
 } from "../catalog-client";
 
 const DEFAULT_RANGES: TemplateRange[] = [
@@ -18,6 +21,18 @@ const DEFAULT_RANGES: TemplateRange[] = [
   { minAmount: "1000000", maxAmount: "2299999.99", installments: [9, 6, 3, 1] },
   { minAmount: "2300000", maxAmount: "99999999", installments: [6, 3, 1] },
 ];
+
+const TEMPLATE_STATUS_TRANSITIONS: Record<CatalogStatus, CatalogStatus[]> = {
+  ACTIVE: ["INACTIVE", "ARCHIVED"],
+  INACTIVE: ["ACTIVE", "ARCHIVED"],
+  ARCHIVED: [],
+};
+
+const STATUS_LABEL: Record<CatalogStatus, string> = {
+  ACTIVE: "Activo",
+  INACTIVE: "Inactivo",
+  ARCHIVED: "Archivado",
+};
 
 export default function PlantillasPage() {
   const identity = useIdentity();
@@ -63,6 +78,19 @@ export default function PlantillasPage() {
   if (identity.status === "error") return <p className="identity-badge-error">{identity.message}</p>;
   if (!userId || templates === null) return <p>Cargando plantillas…</p>;
 
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await reload(userId!);
+    } catch (err) {
+      setError(err instanceof CatalogApiError ? err.message : "Ocurrió un error inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section>
       {error && <p className="identity-badge-error">{error}</p>}
@@ -71,41 +99,180 @@ export default function PlantillasPage() {
         <CreateTemplateForm
           banks={banks}
           disabled={busy}
-          onSubmit={async (input) => {
-            setBusy(true);
-            setError(null);
-            try {
-              await createTemplate(userId, input);
-              await reload(userId);
-            } catch (err) {
-              setError(err instanceof CatalogApiError ? err.message : "Ocurrió un error inesperado.");
-            } finally {
-              setBusy(false);
-            }
-          }}
+          onSubmit={(input) => run(() => createTemplate(userId, input))}
         />
       )}
 
       <div className="grid">
         {templates.map((template) => (
-          <article className="card" key={template.id}>
-            <div className="card-header">
-              <h2>{template.name}</h2>
-              <span className={`status-badge status-${template.status.toLowerCase()}`}>
-                {template.status}
-              </span>
-            </div>
-            <p>{template.description || "Sin descripción."}</p>
-            <p className="muted">
-              Alcance: {template.scope === "GENERAL" ? "General" : `Banco (${template.currentVersion?.bank?.name ?? "-"})`}
-              {" · "}
-              Versión {template.currentVersion?.versionNumber ?? "-"}
-            </p>
-          </article>
+          <TemplateCard
+            key={template.id}
+            template={template}
+            banks={banks}
+            canWrite={canWrite}
+            disabled={busy}
+            onStatusChange={(status) => run(() => updateTemplate(userId, template.id, { status }))}
+            onNewVersion={(input) => run(() => createTemplateVersion(userId, template.id, input))}
+          />
         ))}
         {templates.length === 0 && <p>Todavía no hay plantillas cargadas.</p>}
       </div>
     </section>
+  );
+}
+
+function TemplateCard({
+  template,
+  banks,
+  canWrite,
+  disabled,
+  onStatusChange,
+  onNewVersion,
+}: {
+  template: Template;
+  banks: Bank[];
+  canWrite: boolean;
+  disabled: boolean;
+  onStatusChange: (status: CatalogStatus) => void;
+  onNewVersion: (input: { bankId?: string; ranges: TemplateRange[]; changeReason: string }) => void;
+}) {
+  const [editingVersion, setEditingVersion] = useState(false);
+
+  return (
+    <article className="card">
+      <div className="card-header">
+        <h2>{template.name}</h2>
+        <span className={`status-badge status-${template.status.toLowerCase()}`}>
+          {STATUS_LABEL[template.status]}
+        </span>
+      </div>
+      <p>{template.description || "Sin descripción."}</p>
+      <p className="muted">
+        Alcance:{" "}
+        {template.scope === "GENERAL"
+          ? "General"
+          : `Banco (${template.currentVersion?.bank?.name ?? "-"})`}
+        {" · "}
+        Versión {template.currentVersion?.versionNumber ?? "-"}
+      </p>
+
+      {canWrite && TEMPLATE_STATUS_TRANSITIONS[template.status].length > 0 && (
+        <div className="actions">
+          {TEMPLATE_STATUS_TRANSITIONS[template.status].map((next) => (
+            <button
+              key={next}
+              className="secondary"
+              disabled={disabled}
+              onClick={() => onStatusChange(next)}
+            >
+              Pasar a {STATUS_LABEL[next]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {canWrite && (
+        <>
+          <button className="secondary" onClick={() => setEditingVersion((value) => !value)}>
+            {editingVersion ? "Cancelar nueva versión" : "Crear nueva versión"}
+          </button>
+          {editingVersion && (
+            <NewVersionForm
+              template={template}
+              banks={banks}
+              disabled={disabled}
+              onSubmit={(input) => {
+                onNewVersion(input);
+                setEditingVersion(false);
+              }}
+            />
+          )}
+        </>
+      )}
+    </article>
+  );
+}
+
+function NewVersionForm({
+  template,
+  banks,
+  disabled,
+  onSubmit,
+}: {
+  template: Template;
+  banks: Bank[];
+  disabled: boolean;
+  onSubmit: (input: { bankId?: string; ranges: TemplateRange[]; changeReason: string }) => void;
+}) {
+  const [bankId, setBankId] = useState(template.currentVersion?.bank?.id ?? "");
+  const [changeReason, setChangeReason] = useState("");
+  const [ranges, setRanges] = useState<TemplateRange[]>(
+    template.currentVersion?.configurationSnapshot.ranges ?? DEFAULT_RANGES,
+  );
+
+  function updateRange(index: number, patch: Partial<TemplateRange>) {
+    setRanges((current) => current.map((range, i) => (i === index ? { ...range, ...patch } : range)));
+  }
+
+  return (
+    <form
+      className="form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({
+          bankId: template.scope === "BANK" ? bankId : undefined,
+          ranges,
+          changeReason,
+        });
+      }}
+    >
+      {template.scope === "BANK" && (
+        <label>
+          Banco
+          <select value={bankId} onChange={(event) => setBankId(event.target.value)} required>
+            <option value="">Seleccioná un banco</option>
+            {banks.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label>
+        Motivo del cambio
+        <input value={changeReason} onChange={(event) => setChangeReason(event.target.value)} required />
+      </label>
+      {ranges.map((range, index) => (
+        <div className="range-row" key={index}>
+          <input
+            value={range.minAmount}
+            onChange={(event) => updateRange(index, { minAmount: event.target.value })}
+            placeholder="Mínimo"
+          />
+          <input
+            value={range.maxAmount}
+            onChange={(event) => updateRange(index, { maxAmount: event.target.value })}
+            placeholder="Máximo"
+          />
+          <input
+            value={range.installments.join(",")}
+            onChange={(event) =>
+              updateRange(index, {
+                installments: event.target.value
+                  .split(",")
+                  .map((value) => Number(value.trim()))
+                  .filter((value) => Number.isFinite(value)),
+              })
+            }
+            placeholder="Cuotas (12,6,3,1)"
+          />
+        </div>
+      ))}
+      <button type="submit" disabled={disabled}>
+        Guardar nueva versión
+      </button>
+    </form>
   );
 }
 

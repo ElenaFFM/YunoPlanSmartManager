@@ -13,7 +13,7 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 | Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. |
 | Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
 | Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
-| Catálogo | Modelo, validaciones, altas, listados, edición y desactivación/archivo de bancos y BINs implementados, con interfaz mínima para probarlos. Edición de plantillas (nuevas versiones), tarjetas y Amex siguen pendientes. |
+| Catálogo | Modelo, validaciones, altas, listados, edición y desactivación/archivo de bancos, BINs y plantillas (con versionado inmutable) implementados, con interfaz mínima para probarlos. Tarjetas y Amex siguen pendientes. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
 | Yuno | Sin escrituras ni contract tests todavía. |
 
@@ -72,7 +72,7 @@ Usuario autenticado puede entrar y se comprueba autorización real por API.
 - [x] Pruebas unitarias y prueba de integración preparada.
 - [x] Aplicar la migración del catálogo en la base de pruebas y ejecutar la integración.
 - [x] Completar edición, desactivación y archivo de bancos/BINs.
-- [ ] Crear nuevas versiones al editar plantillas y permitir su desactivación sin efectos remotos.
+- [x] Crear nuevas versiones al editar plantillas y permitir su desactivación sin efectos remotos.
 - [ ] Tarjetas de prueba.
 - [ ] Configuración inicial Amex y su estructura especial.
 - [x] Interfaz de usuario mínima del catálogo (altas, edición y estados de bancos/BINs; alta y listado de plantillas) usando el usuario `ADMIN` de desarrollo.

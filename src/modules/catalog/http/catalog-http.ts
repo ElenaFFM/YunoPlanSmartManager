@@ -39,6 +39,18 @@ export const createTemplateSchema = z.object({
   changeReason: z.string().min(1).max(500),
 });
 
+export const updateTemplateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]).optional(),
+});
+
+export const createTemplateVersionSchema = z.object({
+  bankId: z.string().min(1).optional(),
+  ranges: z.array(rangeSchema),
+  changeReason: z.string().min(1).max(500),
+});
+
 export function catalogErrorResponse(error: unknown) {
   if (error instanceof AuthorizationError) {
     return NextResponse.json(

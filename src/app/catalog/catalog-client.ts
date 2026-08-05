@@ -31,6 +31,7 @@ export type TemplateVersion = {
   canonicalHash: string;
   changeReason: string;
   bank: Bank | null;
+  configurationSnapshot: { ranges: TemplateRange[] };
 };
 
 export type Template = {
@@ -113,6 +114,28 @@ export function updateBankIinStatus(
 
 export function listTemplates(userId: string) {
   return apiFetch<Template[]>(userId, "/api/catalog/templates");
+}
+
+export function updateTemplate(
+  userId: string,
+  templateId: string,
+  input: { name?: string; description?: string; status?: CatalogStatus },
+) {
+  return apiFetch<Template>(userId, `/api/catalog/templates/${templateId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createTemplateVersion(
+  userId: string,
+  templateId: string,
+  input: { bankId?: string; ranges: TemplateRange[]; changeReason: string },
+) {
+  return apiFetch<Template>(userId, `/api/catalog/templates/${templateId}/versions`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function createTemplate(

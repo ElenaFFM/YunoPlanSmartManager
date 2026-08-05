@@ -37,6 +37,40 @@ export type CreateTemplateInput = {
   createdById: string;
 };
 
+export type UpdateTemplateInput = {
+  name?: string;
+  description?: string;
+  status?: CatalogStatus;
+};
+
+export type CreateTemplateVersionInput = {
+  bankId?: string;
+  ranges: readonly TemplateRangeInput[];
+  changeReason: string;
+  createdById: string;
+};
+
+const TEMPLATE_STATUS_TRANSITIONS: Record<CatalogStatus, readonly CatalogStatus[]> = {
+  ACTIVE: ["INACTIVE", "ARCHIVED"],
+  INACTIVE: ["ACTIVE", "ARCHIVED"],
+  ARCHIVED: [],
+};
+
+function buildTemplateSnapshot(
+  scope: TemplateScope,
+  bankId: string | undefined,
+  ranges: readonly TemplateRangeInput[],
+) {
+  const configuration = createTemplateConfiguration(ranges);
+  const configurationSnapshot = JSON.parse(
+    JSON.stringify(configuration),
+  ) as Prisma.InputJsonValue;
+  const canonicalHash = createHash("sha256")
+    .update(JSON.stringify({ scope, bankId: bankId ?? null, configuration }))
+    .digest("hex");
+  return { configurationSnapshot, canonicalHash };
+}
+
 export class CatalogInputError extends Error {
   readonly code: string;
   readonly status: number;
@@ -180,19 +214,11 @@ export async function createTemplate(input: CreateTemplateInput) {
     throw new CatalogInputError("CAT-TPL-002", "La plantilla General no debe indicar un banco.");
   }
 
-  const configuration = createTemplateConfiguration(input.ranges);
-  const configurationSnapshot = JSON.parse(
-    JSON.stringify(configuration),
-  ) as Prisma.InputJsonValue;
-  const canonicalHash = createHash("sha256")
-    .update(
-      JSON.stringify({
-        scope: input.scope,
-        bankId: input.bankId ?? null,
-        configuration,
-      }),
-    )
-    .digest("hex");
+  const { configurationSnapshot, canonicalHash } = buildTemplateSnapshot(
+    input.scope,
+    input.bankId,
+    input.ranges,
+  );
 
   return prisma.$transaction(async (transaction) => {
     const template = await transaction.promotionTemplate.create({
@@ -223,6 +249,97 @@ export async function createTemplate(input: CreateTemplateInput) {
           include: { bank: true },
         },
       },
+    });
+  });
+}
+
+export async function updateTemplate(templateId: string, input: UpdateTemplateInput) {
+  const existing = await prisma.promotionTemplate.findUnique({ where: { id: templateId } });
+  if (!existing) {
+    throw new CatalogInputError("CAT-TPL-404", "La plantilla indicada no existe.", 404);
+  }
+
+  const data: Prisma.PromotionTemplateUpdateInput = {};
+
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) {
+      throw new CatalogInputError("CAT-TPL-001", "El nombre de la plantilla es obligatorio.");
+    }
+    data.name = name;
+  }
+
+  if (input.description !== undefined) {
+    data.description = normalizeOptionalText(input.description);
+  }
+
+  if (input.status !== undefined && input.status !== existing.status) {
+    const allowed = TEMPLATE_STATUS_TRANSITIONS[existing.status];
+    if (!allowed.includes(input.status)) {
+      throw new CatalogInputError(
+        "CAT-TPL-003",
+        `No se puede pasar la plantilla de ${existing.status} a ${input.status}.`,
+      );
+    }
+    data.status = input.status;
+  }
+
+  return prisma.promotionTemplate.update({
+    where: { id: templateId },
+    data,
+    include: { currentVersion: { include: { bank: true } } },
+  });
+}
+
+export async function createTemplateVersion(
+  templateId: string,
+  input: CreateTemplateVersionInput,
+) {
+  const changeReason = input.changeReason.trim();
+  if (!changeReason) {
+    throw new CatalogInputError("CAT-TPL-001", "El motivo del cambio es obligatorio.");
+  }
+
+  const template = await prisma.promotionTemplate.findUnique({
+    where: { id: templateId },
+    include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+  });
+  if (!template) {
+    throw new CatalogInputError("CAT-TPL-404", "La plantilla indicada no existe.", 404);
+  }
+
+  if (template.scope === "BANK" && !input.bankId) {
+    throw new CatalogInputError("CAT-TPL-002", "Una plantilla bancaria requiere un banco.");
+  }
+  if (template.scope === "GENERAL" && input.bankId) {
+    throw new CatalogInputError("CAT-TPL-002", "La plantilla General no debe indicar un banco.");
+  }
+
+  const { configurationSnapshot, canonicalHash } = buildTemplateSnapshot(
+    template.scope,
+    input.bankId,
+    input.ranges,
+  );
+  const nextVersionNumber = (template.versions[0]?.versionNumber ?? 0) + 1;
+
+  return prisma.$transaction(async (transaction) => {
+    const version = await transaction.templateVersion.create({
+      data: {
+        templateId,
+        versionNumber: nextVersionNumber,
+        canonicalHash,
+        configurationSnapshot,
+        bankId: input.bankId,
+        changeReason,
+        createdById: input.createdById,
+      },
+      include: { bank: true },
+    });
+
+    return transaction.promotionTemplate.update({
+      where: { id: templateId },
+      data: { currentVersionId: version.id },
+      include: { currentVersion: { include: { bank: true } } },
     });
   });
 }

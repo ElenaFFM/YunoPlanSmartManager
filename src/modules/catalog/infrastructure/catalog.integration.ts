@@ -5,8 +5,10 @@ import {
   CatalogInputError,
   createBank,
   createTemplate,
+  createTemplateVersion,
   updateBank,
   updateBankIinStatus,
+  updateTemplate,
 } from "../application/catalog-service";
 
 const testId = `catalog-${Date.now()}`;
@@ -82,6 +84,28 @@ try {
   const snapshot = template.currentVersion?.configurationSnapshot;
   assert.ok(snapshot && typeof snapshot === "object" && !Array.isArray(snapshot));
   assert.equal(snapshot["currency"], "ARS");
+  const firstVersionId = template.currentVersion?.id;
+
+  const revised = await createTemplateVersion(templateId, {
+    ranges: [
+      { minAmount: "0", maxAmount: "199999.99", installments: [18, 12, 6, 3, 1] },
+      { minAmount: "200000", maxAmount: "999999.99", installments: [12, 6, 3, 1] },
+      { minAmount: "1000000", maxAmount: "2299999.99", installments: [9, 6, 3, 1] },
+      { minAmount: "2300000", maxAmount: "99999999", installments: [6, 3, 1] },
+    ],
+    changeReason: "Agregar 18 cuotas al primer tramo",
+    createdById: user.id,
+  });
+  assert.equal(revised.currentVersion?.versionNumber, 2);
+  assert.notEqual(revised.currentVersion?.id, firstVersionId);
+
+  const inactiveTemplate = await updateTemplate(templateId, { status: "INACTIVE" });
+  assert.equal(inactiveTemplate.status, "INACTIVE");
+  assert.equal(
+    inactiveTemplate.currentVersion?.versionNumber,
+    2,
+    "la desactivación no debe alterar la versión vigente",
+  );
 
   console.log("Catalog integration test passed.");
 } finally {
