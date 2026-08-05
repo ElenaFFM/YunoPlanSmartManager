@@ -18,6 +18,22 @@ enum UserStatus {
   DISABLED
 }
 
+enum CatalogStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum IinStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TemplateScope {
+  GENERAL
+  BANK
+}
+
 enum CampaignVersionStatus {
   DRAFT
   VALIDATED
@@ -94,56 +110,127 @@ model User {
   deployments      Deployment[]      @relation("DeploymentCreatedBy")
   runsRequested    ExecutionRun[]    @relation("RunRequestedBy")
   approvals        Approval[]        @relation("ApprovalDecidedBy")
+  templateVersions TemplateVersion[] @relation("TemplateVersionCreatedBy")
+}
+
+model Bank {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String        @unique
+  description String?
+  status      CatalogStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  iins             BankIin[]
+  templateVersions TemplateVersion[]
+
+  @@index([status, name])
+}
+
+model BankIin {
+  id         String    @id @default(cuid())
+  bankId     String
+  value      String
+  status     IinStatus @default(ACTIVE)
+  activeFrom DateTime  @default(now())
+  activeTo   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  bank Bank @relation(fields: [bankId], references: [id])
+
+  @@index([bankId, status])
+  @@index([value, status])
+}
+
+model PromotionTemplate {
+  id               String        @id @default(cuid())
+  name             String        @unique
+  description      String?
+  scope            TemplateScope
+  status           CatalogStatus @default(ACTIVE)
+  currentVersionId String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  currentVersion TemplateVersion?  @relation("CurrentTemplateVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       TemplateVersion[] @relation("TemplateVersions")
+
+  @@index([status, name])
+}
+
+model TemplateVersion {
+  id                    String   @id @default(cuid())
+  templateId            String
+  versionNumber         Int
+  canonicalHash         String
+  configurationSnapshot Json
+  bankId                String?
+  changeReason          String
+  createdById           String
+  createdAt             DateTime @default(now())
+
+  template           PromotionTemplate  @relation("TemplateVersions", fields: [templateId], references: [id])
+  currentForTemplate PromotionTemplate? @relation("CurrentTemplateVersion")
+  bank               Bank?              @relation(fields: [bankId], references: [id])
+  createdBy          User               @relation("TemplateVersionCreatedBy", fields: [createdById], references: [id])
+  campaignVersions   CampaignVersion[]
+
+  @@unique([templateId, versionNumber])
+  @@index([bankId, createdAt])
 }
 
 model Campaign {
-  id               String  @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String
   description      String?
   createdById      String
-  currentVersionId String? @unique
+  currentVersionId String?  @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  createdBy      User             @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  currentVersion CampaignVersion? @relation("CurrentCampaignVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  createdBy      User              @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  currentVersion CampaignVersion?  @relation("CurrentCampaignVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   versions       CampaignVersion[] @relation("CampaignVersions")
 }
 
 model CampaignVersion {
-  id                    String                @id @default(cuid())
-  campaignId            String
-  versionNumber         Int
-  status                CampaignVersionStatus @default(DRAFT)
-  canonicalHash         String
-  changeReason          String
-  configurationSnapshot Json
-  createdById           String
-  createdAt             DateTime              @default(now())
-  supersededAt          DateTime?
+  id                      String                @id @default(cuid())
+  campaignId              String
+  versionNumber           Int
+  status                  CampaignVersionStatus @default(DRAFT)
+  canonicalHash           String
+  changeReason            String
+  configurationSnapshot   Json
+  createdById             String
+  createdAt               DateTime              @default(now())
+  supersededAt            DateTime?
+  sourceTemplateVersionId String?
 
-  campaign           Campaign     @relation("CampaignVersions", fields: [campaignId], references: [id])
-  currentForCampaign Campaign?    @relation("CurrentCampaignVersion")
-  createdBy          User         @relation("VersionCreatedBy", fields: [createdById], references: [id])
-  deployments        Deployment[]
-  approvals          Approval[]
+  campaign              Campaign         @relation("CampaignVersions", fields: [campaignId], references: [id])
+  currentForCampaign    Campaign?        @relation("CurrentCampaignVersion")
+  createdBy             User             @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  deployments           Deployment[]
+  approvals             Approval[]
+  sourceTemplateVersion TemplateVersion? @relation(fields: [sourceTemplateVersionId], references: [id])
 
   @@unique([campaignId, versionNumber])
   @@index([status, createdAt])
 }
 
 model Deployment {
-  id               String           @id @default(cuid())
+  id                String           @id @default(cuid())
   campaignVersionId String
-  environment      Environment
-  kind             DeploymentKind
-  status           DeploymentStatus @default(PLANNED)
+  environment       Environment
+  kind              DeploymentKind
+  status            DeploymentStatus @default(PLANNED)
   configurationHash String
-  baseSnapshotHash String
-  scheduledAt      DateTime?
-  createdById      String
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  baseSnapshotHash  String
+  scheduledAt       DateTime?
+  createdById       String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   campaignVersion CampaignVersion @relation(fields: [campaignVersionId], references: [id])
   createdBy       User            @relation("DeploymentCreatedBy", fields: [createdById], references: [id])
@@ -183,17 +270,17 @@ model ExecutionRun {
 }
 
 model ExecutionOperation {
-  id                      String          @id @default(cuid())
+  id                      String           @id @default(cuid())
   runId                   String
   sequence                Int
   type                    OperationType
-  status                  OperationStatus @default(PENDING)
+  status                  OperationStatus  @default(PENDING)
   targetRemotePlanId      String?
   requestSnapshot         Json?
   responseSnapshot        Json?
   expectedResultSnapshot  Json?
   compensationSnapshot    Json?
-  attemptCount            Int             @default(0)
+  attemptCount            Int              @default(0)
   startedAt               DateTime?
   sentAt                  DateTime?
   finishedAt              DateTime?
@@ -202,8 +289,8 @@ model ExecutionOperation {
   resultCertainty         ResultCertainty?
   compensationOperationId String?
 
-  run                   ExecutionRun        @relation(fields: [runId], references: [id])
-  compensationOperation ExecutionOperation? @relation("OperationCompensation", fields: [compensationOperationId], references: [id])
+  run                   ExecutionRun         @relation(fields: [runId], references: [id])
+  compensationOperation ExecutionOperation?  @relation("OperationCompensation", fields: [compensationOperationId], references: [id])
   compensates           ExecutionOperation[] @relation("OperationCompensation")
 
   @@unique([runId, sequence])
@@ -211,7 +298,7 @@ model ExecutionOperation {
 }
 
 model Approval {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   campaignVersionId String
   executionRunId    String
   planHash          String
@@ -219,7 +306,7 @@ model Approval {
   checklistSnapshot Json
   warningsAccepted  Json?
   decidedById       String
-  decidedAt         DateTime @default(now())
+  decidedAt         DateTime  @default(now())
   revokedAt         DateTime?
   revocationReason  String?
 
@@ -229,4 +316,3 @@ model Approval {
 
   @@index([executionRunId, planHash, revokedAt])
 }
-
