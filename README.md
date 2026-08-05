@@ -37,6 +37,12 @@ npm.cmd run worker:dev
 
 El worker inicial solo observa la queue. No realiza escrituras sobre Yuno hasta completar los contract tests de la Fase 0.
 
+## Identidad durante desarrollo
+
+Hasta elegir el proveedor de identidad, las rutas del catálogo aceptan `x-yuno-user-id` únicamente con `APP_ENV=development` o `test`. El usuario debe existir, estar activo y tener uno de los tres roles fijos; las escrituras del catálogo requieren `ADMIN`.
+
+Este mecanismo queda deshabilitado en staging y producción. Allí las rutas responden como no disponibles hasta conectar una sesión server-side real.
+
 ## Verificación
 
 ```powershell
@@ -50,6 +56,7 @@ La prueba de integración de la queue usa la PostgreSQL configurada, crea datos 
 
 ```powershell
 npm.cmd run test:integration:queue
+npm.cmd run test:integration:catalog
 ```
 
 ## Base de datos
