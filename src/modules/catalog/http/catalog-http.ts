@@ -13,6 +13,17 @@ export const createBankSchema = z.object({
   iins: z.array(z.string()).max(100).default([]),
 });
 
+export const updateBankSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE", "ARCHIVED"]).optional(),
+  addIins: z.array(z.string()).max(100).optional(),
+});
+
+export const updateBankIinStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "INACTIVE"]),
+});
+
 const rangeSchema = z.object({
   minAmount: z.string(),
   maxAmount: z.string(),
@@ -43,11 +54,14 @@ export function catalogErrorResponse(error: unknown) {
     );
   }
 
-  if (
-    error instanceof CatalogInputError ||
-    error instanceof InvalidIinError ||
-    error instanceof InvalidTemplateConfigurationError
-  ) {
+  if (error instanceof CatalogInputError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: error.status },
+    );
+  }
+
+  if (error instanceof InvalidIinError || error instanceof InvalidTemplateConfigurationError) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: 400 },

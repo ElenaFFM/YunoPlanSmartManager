@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Prisma, type TemplateScope } from "@/generated/prisma/client";
+import { CatalogStatus, IinStatus, Prisma, type TemplateScope } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
 import { normalizeUniqueIins } from "../domain/iin";
 import {
@@ -14,6 +14,19 @@ export type CreateBankInput = {
   iins: readonly string[];
 };
 
+export type UpdateBankInput = {
+  name?: string;
+  description?: string;
+  status?: CatalogStatus;
+  addIins?: readonly string[];
+};
+
+const BANK_STATUS_TRANSITIONS: Record<CatalogStatus, readonly CatalogStatus[]> = {
+  ACTIVE: ["INACTIVE", "ARCHIVED"],
+  INACTIVE: ["ACTIVE", "ARCHIVED"],
+  ARCHIVED: [],
+};
+
 export type CreateTemplateInput = {
   name: string;
   description?: string;
@@ -26,11 +39,13 @@ export type CreateTemplateInput = {
 
 export class CatalogInputError extends Error {
   readonly code: string;
+  readonly status: number;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, status = 400) {
     super(message);
     this.name = "CatalogInputError";
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -72,6 +87,68 @@ export async function createBank(input: CreateBankInput) {
       },
     },
     include: { iins: true },
+  });
+}
+
+export async function updateBank(bankId: string, input: UpdateBankInput) {
+  const existing = await prisma.bank.findUnique({ where: { id: bankId } });
+  if (!existing) {
+    throw new CatalogInputError("CAT-BANK-404", "El banco indicado no existe.", 404);
+  }
+
+  const data: Prisma.BankUpdateInput = {};
+
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) {
+      throw new CatalogInputError("CAT-BANK-001", "El nombre del banco es obligatorio.");
+    }
+    data.name = name;
+  }
+
+  if (input.description !== undefined) {
+    data.description = normalizeOptionalText(input.description);
+  }
+
+  if (input.status !== undefined && input.status !== existing.status) {
+    const allowed = BANK_STATUS_TRANSITIONS[existing.status];
+    if (!allowed.includes(input.status)) {
+      throw new CatalogInputError(
+        "CAT-BANK-002",
+        `No se puede pasar el banco de ${existing.status} a ${input.status}.`,
+      );
+    }
+    data.status = input.status;
+  }
+
+  const newIins = input.addIins?.length ? normalizeUniqueIins(input.addIins) : [];
+  if (newIins.length) {
+    data.iins = { create: newIins.map((value) => ({ value })) };
+  }
+
+  return prisma.bank.update({
+    where: { id: bankId },
+    data,
+    include: { iins: true },
+  });
+}
+
+export async function updateBankIinStatus(bankId: string, iinId: string, status: IinStatus) {
+  const iin = await prisma.bankIin.findFirst({ where: { id: iinId, bankId } });
+  if (!iin) {
+    throw new CatalogInputError("CAT-IIN-404", "El BIN/IIN indicado no existe para este banco.", 404);
+  }
+  if (iin.status === status) {
+    return iin;
+  }
+
+  return prisma.bankIin.update({
+    where: { id: iinId },
+    data: {
+      status,
+      activeFrom: status === "ACTIVE" ? new Date() : iin.activeFrom,
+      activeTo: status === "INACTIVE" ? new Date() : null,
+    },
   });
 }
 

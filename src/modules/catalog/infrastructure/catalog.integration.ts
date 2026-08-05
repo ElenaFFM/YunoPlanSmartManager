@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
-import { createBank, createTemplate } from "../application/catalog-service";
+import {
+  CatalogInputError,
+  createBank,
+  createTemplate,
+  updateBank,
+  updateBankIinStatus,
+} from "../application/catalog-service";
 
 const testId = `catalog-${Date.now()}`;
 const bankCode = `T${String(Date.now()).slice(-8)}`;
@@ -35,6 +41,28 @@ try {
       iins: [iin],
     }),
     (error) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002",
+  );
+
+  const renamed = await updateBank(bankId, { name: `Banco ${testId} renombrado` });
+  assert.equal(renamed.name, `Banco ${testId} renombrado`);
+
+  const deactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "INACTIVE");
+  assert.equal(deactivatedIin.status, "INACTIVE");
+  assert.ok(deactivatedIin.activeTo);
+
+  const reactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "ACTIVE");
+  assert.equal(reactivatedIin.status, "ACTIVE");
+  assert.equal(reactivatedIin.activeTo, null);
+
+  const inactiveBank = await updateBank(bankId, { status: "INACTIVE" });
+  assert.equal(inactiveBank.status, "INACTIVE");
+
+  const archivedBank = await updateBank(bankId, { status: "ARCHIVED" });
+  assert.equal(archivedBank.status, "ARCHIVED");
+
+  await assert.rejects(
+    updateBank(bankId, { status: "ACTIVE" }),
+    (error) => error instanceof CatalogInputError && error.code === "CAT-BANK-002",
   );
 
   const template = await createTemplate({
