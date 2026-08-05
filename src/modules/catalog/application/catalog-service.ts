@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { CatalogStatus, IinStatus, Prisma, type TemplateScope } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
+import { recordAuditEvent } from "@/modules/audit/application/audit-writer";
 import { normalizeIin, normalizeUniqueIins } from "../domain/iin";
 import {
   createTemplateConfiguration,
@@ -105,7 +106,7 @@ export async function listBanks() {
   });
 }
 
-export async function createBank(input: CreateBankInput) {
+export async function createBank(input: CreateBankInput, actorId: string) {
   const code = input.code.trim().toUpperCase();
   const name = input.name.trim();
   const description = normalizeOptionalText(input.description);
@@ -122,20 +123,32 @@ export async function createBank(input: CreateBankInput) {
     throw new CatalogInputError("CAT-BANK-001", "El nombre del banco es obligatorio.");
   }
 
-  return prisma.bank.create({
-    data: {
-      code,
-      name,
-      description,
-      iins: {
-        create: iins.map((value) => ({ value })),
+  return prisma.$transaction(async (transaction) => {
+    const bank = await transaction.bank.create({
+      data: {
+        code,
+        name,
+        description,
+        iins: {
+          create: iins.map((value) => ({ value })),
+        },
       },
-    },
-    include: { iins: true },
+      include: { iins: true },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "bank.create",
+      entityType: "Bank",
+      entityId: bank.id,
+      metadata: { code, name, iins },
+    });
+
+    return bank;
   });
 }
 
-export async function updateBank(bankId: string, input: UpdateBankInput) {
+export async function updateBank(bankId: string, input: UpdateBankInput, actorId: string) {
   const existing = await prisma.bank.findUnique({ where: { id: bankId } });
   if (!existing) {
     throw new CatalogInputError("CAT-BANK-404", "El banco indicado no existe.", 404);
@@ -171,14 +184,31 @@ export async function updateBank(bankId: string, input: UpdateBankInput) {
     data.iins = { create: newIins.map((value) => ({ value })) };
   }
 
-  return prisma.bank.update({
-    where: { id: bankId },
-    data,
-    include: { iins: true },
+  return prisma.$transaction(async (transaction) => {
+    const bank = await transaction.bank.update({
+      where: { id: bankId },
+      data,
+      include: { iins: true },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "bank.update",
+      entityType: "Bank",
+      entityId: bankId,
+      metadata: { before: { name: existing.name, status: existing.status }, changes: input },
+    });
+
+    return bank;
   });
 }
 
-export async function updateBankIinStatus(bankId: string, iinId: string, status: IinStatus) {
+export async function updateBankIinStatus(
+  bankId: string,
+  iinId: string,
+  status: IinStatus,
+  actorId: string,
+) {
   const iin = await prisma.bankIin.findFirst({ where: { id: iinId, bankId } });
   if (!iin) {
     throw new CatalogInputError("CAT-IIN-404", "El BIN/IIN indicado no existe para este banco.", 404);
@@ -187,13 +217,25 @@ export async function updateBankIinStatus(bankId: string, iinId: string, status:
     return iin;
   }
 
-  return prisma.bankIin.update({
-    where: { id: iinId },
-    data: {
-      status,
-      activeFrom: status === "ACTIVE" ? new Date() : iin.activeFrom,
-      activeTo: status === "INACTIVE" ? new Date() : null,
-    },
+  return prisma.$transaction(async (transaction) => {
+    const updated = await transaction.bankIin.update({
+      where: { id: iinId },
+      data: {
+        status,
+        activeFrom: status === "ACTIVE" ? new Date() : iin.activeFrom,
+        activeTo: status === "INACTIVE" ? new Date() : null,
+      },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "bank_iin.status_change",
+      entityType: "BankIin",
+      entityId: iinId,
+      metadata: { bankId, value: iin.value, from: iin.status, to: status },
+    });
+
+    return updated;
   });
 }
 
@@ -247,7 +289,7 @@ export async function createTemplate(input: CreateTemplateInput) {
       include: { bank: true },
     });
 
-    return transaction.promotionTemplate.update({
+    const result = await transaction.promotionTemplate.update({
       where: { id: template.id },
       data: { currentVersionId: version.id },
       include: {
@@ -256,10 +298,24 @@ export async function createTemplate(input: CreateTemplateInput) {
         },
       },
     });
+
+    await recordAuditEvent(transaction, {
+      actorId: input.createdById,
+      action: "template.create",
+      entityType: "PromotionTemplate",
+      entityId: template.id,
+      metadata: { name, scope: input.scope, bankId: input.bankId ?? null, changeReason },
+    });
+
+    return result;
   });
 }
 
-export async function updateTemplate(templateId: string, input: UpdateTemplateInput) {
+export async function updateTemplate(
+  templateId: string,
+  input: UpdateTemplateInput,
+  actorId: string,
+) {
   const existing = await prisma.promotionTemplate.findUnique({ where: { id: templateId } });
   if (!existing) {
     throw new CatalogInputError("CAT-TPL-404", "La plantilla indicada no existe.", 404);
@@ -290,10 +346,22 @@ export async function updateTemplate(templateId: string, input: UpdateTemplateIn
     data.status = input.status;
   }
 
-  return prisma.promotionTemplate.update({
-    where: { id: templateId },
-    data,
-    include: { currentVersion: { include: { bank: true } } },
+  return prisma.$transaction(async (transaction) => {
+    const template = await transaction.promotionTemplate.update({
+      where: { id: templateId },
+      data,
+      include: { currentVersion: { include: { bank: true } } },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "template.update",
+      entityType: "PromotionTemplate",
+      entityId: templateId,
+      metadata: { before: { name: existing.name, status: existing.status }, changes: input },
+    });
+
+    return template;
   });
 }
 
@@ -337,11 +405,21 @@ export async function createTemplateVersion(
       include: { bank: true },
     });
 
-    return transaction.promotionTemplate.update({
+    const result = await transaction.promotionTemplate.update({
       where: { id: templateId },
       data: { currentVersionId: version.id },
       include: { currentVersion: { include: { bank: true } } },
     });
+
+    await recordAuditEvent(transaction, {
+      actorId: input.createdById,
+      action: "template.version_create",
+      entityType: "PromotionTemplate",
+      entityId: templateId,
+      metadata: { versionNumber: nextVersionNumber, bankId: input.bankId ?? null, changeReason },
+    });
+
+    return result;
   });
 }
 
@@ -359,7 +437,7 @@ export async function listTestCards() {
   });
 }
 
-export async function createTestCard(input: CreateTestCardInput) {
+export async function createTestCard(input: CreateTestCardInput, actorId: string) {
   const label = input.label.trim();
   const cardNumber = input.cardNumber.trim();
   const iin = normalizeIin(input.iin);
@@ -380,22 +458,46 @@ export async function createTestCard(input: CreateTestCardInput) {
     }
   }
 
-  return prisma.testCard.create({
-    data: { bankId: input.bankId, label, cardNumber, iin },
-    include: { bank: true },
+  return prisma.$transaction(async (transaction) => {
+    const testCard = await transaction.testCard.create({
+      data: { bankId: input.bankId, label, cardNumber, iin },
+      include: { bank: true },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "test_card.create",
+      entityType: "TestCard",
+      entityId: testCard.id,
+      metadata: { label, iin, bankId: input.bankId ?? null, cardLastFour: cardNumber.slice(-4) },
+    });
+
+    return testCard;
   });
 }
 
-export async function updateTestCardStatus(testCardId: string, active: boolean) {
+export async function updateTestCardStatus(testCardId: string, active: boolean, actorId: string) {
   const testCard = await prisma.testCard.findUnique({ where: { id: testCardId } });
   if (!testCard) {
     throw new CatalogInputError("CAT-CARD-404", "La tarjeta de prueba indicada no existe.", 404);
   }
 
-  return prisma.testCard.update({
-    where: { id: testCardId },
-    data: { active },
-    include: { bank: true },
+  return prisma.$transaction(async (transaction) => {
+    const updated = await transaction.testCard.update({
+      where: { id: testCardId },
+      data: { active },
+      include: { bank: true },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId,
+      action: "test_card.status_change",
+      entityType: "TestCard",
+      entityId: testCardId,
+      metadata: { label: testCard.label, from: testCard.active, to: active },
+    });
+
+    return updated;
   });
 }
 

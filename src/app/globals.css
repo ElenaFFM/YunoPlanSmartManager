@@ -233,3 +233,28 @@ button.secondary {
   color: var(--muted);
 }
 
+.audit-table-wrap {
+  overflow-x: auto;
+}
+
+.audit-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.audit-table th,
+.audit-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.audit-table code {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+

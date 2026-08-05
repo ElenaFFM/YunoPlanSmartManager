@@ -187,3 +187,17 @@ export function updateTestCardStatus(userId: string, testCardId: string, active:
     body: JSON.stringify({ active }),
   });
 }
+
+export type AuditEvent = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  actor: { id: string; displayName: string; email: string } | null;
+};
+
+export function listAuditEvents(userId: string) {
+  return apiFetch<AuditEvent[]>(userId, "/api/audit/events");
+}

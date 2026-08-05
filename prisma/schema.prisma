@@ -112,6 +112,22 @@ model User {
   runsRequested    ExecutionRun[]    @relation("RunRequestedBy")
   approvals        Approval[]        @relation("ApprovalDecidedBy")
   templateVersions TemplateVersion[] @relation("TemplateVersionCreatedBy")
+  auditEvents      AuditEvent[]      @relation("AuditEventActor")
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditEventActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 model Bank {

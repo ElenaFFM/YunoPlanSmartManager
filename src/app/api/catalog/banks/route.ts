@@ -14,9 +14,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await authorizeRequest(request, ["ADMIN"]);
+    const actor = await authorizeRequest(request, ["ADMIN"]);
     const input = createBankSchema.parse(await request.json());
-    const bank = await createBank(input);
+    const bank = await createBank(input, actor.id);
     return NextResponse.json({ data: bank }, { status: 201 });
   } catch (error) {
     return catalogErrorResponse(error);

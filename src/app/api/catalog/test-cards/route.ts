@@ -14,9 +14,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await authorizeRequest(request, ["ADMIN"]);
+    const actor = await authorizeRequest(request, ["ADMIN"]);
     const input = createTestCardSchema.parse(await request.json());
-    const testCard = await createTestCard(input);
+    const testCard = await createTestCard(input, actor.id);
     return NextResponse.json({ data: testCard }, { status: 201 });
   } catch (error) {
     return catalogErrorResponse(error);

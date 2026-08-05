@@ -11,10 +11,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; iinId: string }> },
 ) {
   try {
-    await authorizeRequest(request, ["ADMIN"]);
+    const actor = await authorizeRequest(request, ["ADMIN"]);
     const { id, iinId } = await params;
     const input = updateBankIinStatusSchema.parse(await request.json());
-    const iin = await updateBankIinStatus(id, iinId, input.status);
+    const iin = await updateBankIinStatus(id, iinId, input.status, actor.id);
     return NextResponse.json({ data: iin });
   } catch (error) {
     return catalogErrorResponse(error);

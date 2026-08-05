@@ -5,10 +5,10 @@ import { authorizeRequest } from "@/modules/identity/application/authorize-reque
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await authorizeRequest(request, ["ADMIN"]);
+    const actor = await authorizeRequest(request, ["ADMIN"]);
     const { id } = await params;
     const input = updateTemplateSchema.parse(await request.json());
-    const template = await updateTemplate(id, input);
+    const template = await updateTemplate(id, input, actor.id);
     return NextResponse.json({ data: template });
   } catch (error) {
     return catalogErrorResponse(error);

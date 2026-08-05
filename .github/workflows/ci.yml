@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
+      YUNO_ENV: sandbox
+      # A placeholder is enough for lint/typecheck/build: Prisma Client generation only
+      # needs a syntactically valid connection string, it never connects here. The
+      # integration tests that do connect to the shared PostgreSQL are intentionally
+      # not run in CI — wiring a real DATABASE_URL secret is a separate decision for
+      # whoever owns the Railway database, since it would let CI runs write to it.
+      DATABASE_URL: postgresql://user:password@localhost:5432/ci_placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

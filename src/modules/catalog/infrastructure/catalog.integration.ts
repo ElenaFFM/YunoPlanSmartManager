@@ -33,42 +33,48 @@ try {
   });
   userId = user.id;
 
-  const bank = await createBank({
-    code: bankCode,
-    name: `Banco ${testId}`,
-    iins: [iin],
-  });
+  const bank = await createBank(
+    {
+      code: bankCode,
+      name: `Banco ${testId}`,
+      iins: [iin],
+    },
+    user.id,
+  );
   bankId = bank.id;
   assert.equal(bank.iins[0]?.value, iin);
 
   await assert.rejects(
-    createBank({
-      code: `${bankCode}X`,
-      name: `Otro banco ${testId}`,
-      iins: [iin],
-    }),
+    createBank(
+      {
+        code: `${bankCode}X`,
+        name: `Otro banco ${testId}`,
+        iins: [iin],
+      },
+      user.id,
+    ),
     (error) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002",
   );
 
-  const renamed = await updateBank(bankId, { name: `Banco ${testId} renombrado` });
+  const renamed = await updateBank(bankId, { name: `Banco ${testId} renombrado` }, user.id);
   assert.equal(renamed.name, `Banco ${testId} renombrado`);
 
-  const deactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "INACTIVE");
+  const deactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "INACTIVE", user.id);
   assert.equal(deactivatedIin.status, "INACTIVE");
   assert.ok(deactivatedIin.activeTo);
 
-  const reactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "ACTIVE");
+  const reactivatedIin = await updateBankIinStatus(bankId, bank.iins[0].id, "ACTIVE", user.id);
   assert.equal(reactivatedIin.status, "ACTIVE");
   assert.equal(reactivatedIin.activeTo, null);
 
-  const inactiveBank = await updateBank(bankId, { status: "INACTIVE" });
+  const inactiveBank = await updateBank(bankId, { status: "INACTIVE" }, user.id);
   assert.equal(inactiveBank.status, "INACTIVE");
 
-  const archivedBank = await updateBank(bankId, { status: "ARCHIVED" });
+  const archivedBank = await updateBank(bankId, { status: "ARCHIVED" }, user.id);
   assert.equal(archivedBank.status, "ARCHIVED");
 
   await assert.rejects(
-    updateBank(bankId, { status: "ACTIVE" }),
+    updateBank(bankId, { status: "ACTIVE" }, user.id),
     (error) => error instanceof CatalogInputError && error.code === "CAT-BANK-002",
   );
 
@@ -104,7 +110,7 @@ try {
   assert.equal(revised.currentVersion?.versionNumber, 2);
   assert.notEqual(revised.currentVersion?.id, firstVersionId);
 
-  const inactiveTemplate = await updateTemplate(templateId, { status: "INACTIVE" });
+  const inactiveTemplate = await updateTemplate(templateId, { status: "INACTIVE" }, user.id);
   assert.equal(inactiveTemplate.status, "INACTIVE");
   assert.equal(
     inactiveTemplate.currentVersion?.versionNumber,
@@ -151,20 +157,31 @@ try {
     (error) => error instanceof InvalidTemplateConfigurationError && error.code === "TPL-001",
   );
 
-  const testCard = await createTestCard({
-    bankId,
-    label: `Tarjeta ${testId}`,
-    cardNumber: "4000000000000000",
-    iin: iin,
-  });
+  const testCard = await createTestCard(
+    {
+      bankId,
+      label: `Tarjeta ${testId}`,
+      cardNumber: "4000000000000000",
+      iin: iin,
+    },
+    user.id,
+  );
   testCardId = testCard.id;
   assert.equal(testCard.active, true);
 
-  const deactivatedCard = await updateTestCardStatus(testCardId, false);
+  const deactivatedCard = await updateTestCardStatus(testCardId, false, user.id);
   assert.equal(deactivatedCard.active, false);
+
+  const auditEvents = await prisma.auditEvent.findMany({ where: { actorId: user.id } });
+  assert.ok(auditEvents.length >= 10, "cada mutación del catálogo debe dejar un evento de auditoría");
+  assert.ok(auditEvents.some((event) => event.action === "bank.create"));
+  assert.ok(auditEvents.some((event) => event.action === "test_card.status_change"));
 
   console.log("Catalog integration test passed.");
 } finally {
+  if (userId) {
+    await prisma.auditEvent.deleteMany({ where: { actorId: userId } });
+  }
   if (testCardId) {
     await prisma.testCard.delete({ where: { id: testCardId } });
   }

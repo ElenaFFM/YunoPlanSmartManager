@@ -4,16 +4,17 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 5 de agosto de 2026 (Fase 2 completa: tarjetas de prueba y scope Amex agregados)
+**Última actualización:** 5 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1 agregados)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
 | Área | Estado actual |
 |---|---|
-| Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. |
+| Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. CI en GitHub Actions. |
 | Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
 | Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
 | Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
+| Auditoría | Todas las mutaciones del catálogo generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de campañas/ejecuciones pendiente de que existan. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
 | Yuno | Sin escrituras ni contract tests todavía. |
 
@@ -52,9 +53,9 @@ No quedan supuestos críticos sobre el contrato remoto, la conexión cross-cloud
 - [x] Roles fijos `VIEWER | OPERATOR | ADMIN` y autorización central para las rutas implementadas.
 - [x] Esqueleto del worker y mecanismo de claim/lease sobre PostgreSQL.
 - [ ] Autenticación server-side real para staging/producción. El header temporal está limitado a desarrollo/test.
-- [ ] Audit writer.
-- [ ] CI.
-- [ ] Observabilidad inicial más allá del health check y logs básicos.
+- [x] Audit writer: `AuditEvent` por cada alta/edición/desactivación de bancos, BINs, plantillas y tarjetas de prueba, con actor, entidad y detalle, escrito en la misma transacción que la mutación. Lectura vía `/api/audit/events` y `/catalog/auditoria`.
+- [x] CI: GitHub Actions (`.github/workflows/ci.yml`) corre lint, typecheck, unit tests y build en cada push/PR a `main`. Las pruebas de integración que requieren la PostgreSQL compartida quedan fuera del pipeline hasta decidir cómo manejar esa credencial en CI.
+- [ ] Observabilidad inicial más allá del health check y logs básicos (logs estructurados, métricas y alertas — corresponde a cuando exista ejecución real contra Yuno).
 
 ### Salida
 
