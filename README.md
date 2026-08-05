@@ -46,6 +46,12 @@ npm.cmd test
 npm.cmd run build
 ```
 
+La prueba de integración de la queue usa la PostgreSQL configurada, crea datos efímeros y los elimina al finalizar:
+
+```powershell
+npm.cmd run test:integration:queue
+```
+
 ## Base de datos
 
 Las migraciones se ejecutan de forma coordinada por una sola persona/proceso:

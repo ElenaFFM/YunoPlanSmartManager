@@ -11,6 +11,7 @@ describe("server environment", () => {
     });
 
     assert.equal(environment.WORKER_POLL_INTERVAL_MS, 5_000);
+    assert.equal(environment.WORKER_LEASE_DURATION_MS, 30_000);
   });
 
   it("blocks production Yuno outside the production application environment", () => {
