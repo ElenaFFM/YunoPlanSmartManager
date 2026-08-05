@@ -4,14 +4,14 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 5 de agosto de 2026
+**Última actualización:** 5 de agosto de 2026 (migración del catálogo aplicada e integraciones verificadas)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
 | Área | Estado actual |
 |---|---|
 | Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. |
-| Persistencia | Prisma configurado; migración inicial aplicada. La migración del catálogo está versionada y pendiente de aplicar en la PostgreSQL de pruebas. |
+| Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
 | Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
 | Catálogo | Modelo, validaciones, altas y listados de bancos/plantillas implementados. CRUD completo, tarjetas y Amex siguen pendientes. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
@@ -70,7 +70,7 @@ Usuario autenticado puede entrar y se comprueba autorización real por API.
 - [x] Cuatro rangos ARS editables, completos, contiguos y sin superposición; montos tratados con precisión de centavos.
 - [x] Sets de cuotas positivos, únicos, descendentes y con cuota `1`; tasa fija en `1`.
 - [x] Pruebas unitarias y prueba de integración preparada.
-- [ ] Aplicar la migración del catálogo en la base de pruebas y ejecutar la integración.
+- [x] Aplicar la migración del catálogo en la base de pruebas y ejecutar la integración.
 - [ ] Completar edición, desactivación y archivo de bancos/BINs.
 - [ ] Crear nuevas versiones al editar plantillas y permitir su desactivación sin efectos remotos.
 - [ ] Tarjetas de prueba.

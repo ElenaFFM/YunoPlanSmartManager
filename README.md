@@ -9,7 +9,7 @@ El repositorio está en desarrollo. La documentación funcional y técnica vive 
 - Aplicación Next.js, Prisma, validación de ambiente y worker Node.js separados.
 - Queue PostgreSQL con claim/lease durable; el worker todavía no escribe en Yuno.
 - Modelo, reglas de dominio y API inicial del catálogo para bancos, BIN/IIN y plantillas.
-- Migración del catálogo versionada pero todavía pendiente de aplicar en la PostgreSQL de pruebas.
+- Migración del catálogo aplicada en la PostgreSQL de pruebas; integración de catálogo y de queue verificadas.
 - 16 pruebas unitarias, lint, typecheck y build verificados.
 - Autenticación productiva, CRUD completo del catálogo, interfaz y conexión Yuno pendientes.
 
