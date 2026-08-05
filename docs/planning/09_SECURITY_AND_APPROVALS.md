@@ -27,6 +27,16 @@ Los roles son un enum fijo en `User`; no existen permisos configurables ni tabla
 - El rol se evalúa en una política centralizada para cada comando de aplicación.
 - Los workers vuelven a verificar que el run fue autorizado y no revocado.
 
+### Estado implementado
+
+- Los roles son un enum fijo en `User`; no existen tablas de permisos.
+- Las rutas actuales del catálogo usan una función central de autorización.
+- Lectura de catálogo acepta `VIEWER`, `OPERATOR` o `ADMIN`; las escrituras requieren `ADMIN`.
+- Durante desarrollo y test, la identidad se indica mediante `x-yuno-user-id` y se valida contra un usuario activo en PostgreSQL.
+- Ese header está deshabilitado en staging y producción. Hasta integrar el proveedor de identidad y una sesión server-side real, las rutas responden `IDENTITY_NOT_CONFIGURED` en esos ambientes.
+
+El header temporal es una ayuda de desarrollo, no el mecanismo de autenticación productivo.
+
 ## 4. Gates de campaña
 
 Para producción se exige:

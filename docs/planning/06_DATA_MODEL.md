@@ -34,6 +34,12 @@ erDiagram
 
 ## 3. Catálogo
 
+### Estado implementado
+
+El esquema Prisma y la migración versionada ya incluyen `Bank`, `BankIin`, `PromotionTemplate` y `TemplateVersion`. También se agregó `CampaignVersion.sourceTemplateVersionId` para conservar el origen de una campaña. La migración del catálogo todavía debe aplicarse en la PostgreSQL remota de pruebas.
+
+La primera iteración implementa únicamente scopes `GENERAL` y `BANK`. `TestCard`, Amex y otros scopes especiales permanecen como diseño pendiente, no como tablas o enums disponibles hoy.
+
 ### `Bank`
 
 - `id`
@@ -51,10 +57,10 @@ General y Amex pueden modelarse como scopes especiales; Amex puede tener una ent
 - `bankId`
 - `value` normalizado
 - `activeFrom`, `activeTo`
-- `status`
-- auditoría de alta/baja
+- `status`: `ACTIVE | INACTIVE`
+- `createdAt`, `updatedAt`
 
-Restricción: un BIN activo pertenece a un único banco.
+La aplicación valida valores numéricos de 6 a 8 dígitos. Un índice único parcial de PostgreSQL garantiza que un BIN/IIN activo pertenezca a un solo banco y permite conservar registros inactivos como historia.
 
 ### `TestCard`
 
@@ -69,16 +75,15 @@ Aunque sean tarjetas de QA, la UI evitará exposición innecesaria y distinguir�
 
 ### `PromotionTemplate` y `TemplateVersion`
 
-La entidad estable contiene nombre, tipo, estado y referencia a versión actual. Cada versión contiene el snapshot de:
+La entidad estable contiene nombre, scope, estado y referencia a versión actual. La implementación actual soporta `GENERAL | BANK`. Cada versión contiene:
 
-- scope/nivel;
-- cuatro rangos o estructura especial;
+- referencia opcional al banco;
+- hash canónico y motivo del cambio;
+- snapshot JSON validado de cuatro rangos ARS;
 - cuotas por rango;
-- BINs referenciados o estrategia de resolución;
-- naming defaults;
-- reglas configurables.
+- usuario creador y número de versión.
 
-Desactivar una plantilla no modifica versiones consumidas.
+La primera versión se crea de forma transaccional junto con la plantilla. La creación de versiones posteriores y la desactivación sin efectos remotos están pendientes.
 
 ## 4. Campañas
 

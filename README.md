@@ -2,7 +2,16 @@
 
 Aplicación interna para planificar, validar, probar, aprobar y ejecutar campañas de cuotas de Yuno en Argentina.
 
-El repositorio está en la fase inicial de desarrollo. La documentación funcional y técnica vive en [`docs/planning`](docs/planning/README.md).
+El repositorio está en desarrollo. La documentación funcional y técnica vive en [`docs/planning`](docs/planning/README.md), y el avance actualizado se registra en el [roadmap](docs/planning/12_IMPLEMENTATION_ROADMAP.md).
+
+## Estado actual
+
+- Aplicación Next.js, Prisma, validación de ambiente y worker Node.js separados.
+- Queue PostgreSQL con claim/lease durable; el worker todavía no escribe en Yuno.
+- Modelo, reglas de dominio y API inicial del catálogo para bancos, BIN/IIN y plantillas.
+- Migración del catálogo versionada pero todavía pendiente de aplicar en la PostgreSQL de pruebas.
+- 16 pruebas unitarias, lint, typecheck y build verificados.
+- Autenticación productiva, CRUD completo del catálogo, interfaz y conexión Yuno pendientes.
 
 ## Requisitos
 

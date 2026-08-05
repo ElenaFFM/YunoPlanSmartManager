@@ -1,14 +1,17 @@
 # Planificación de Yuno Plan Manager
 
-**Estado:** planificación funcional y técnica inicial  
-**Fecha base:** 5 de agosto de 2026  
-**Alcance:** nueva aplicación para administrar planes de cuotas de Yuno en Argentina  
+- **Estado:** planificación consolidada y desarrollo en curso
+- **Fecha base:** 5 de agosto de 2026
+- **Última actualización de implementación:** 5 de agosto de 2026
+- **Alcance:** nueva aplicación para administrar planes de cuotas de Yuno en Argentina
 
 ## Objetivo del paquete
 
 Este directorio organiza las decisiones, reglas, flujos, riesgos y etapas de implementación acordadas antes de escribir código. El producto se construirá desde cero; la aplicación existente `YunoPlanManager` se utilizará únicamente como referencia de integración y experiencia previa.
 
 La documentación debe mantenerse actualizada junto con el código. Una decisión que cambie el comportamiento del producto deberá modificar primero o en el mismo cambio el documento correspondiente.
+
+El avance ejecutado se mantiene en el [roadmap de implementación](12_IMPLEMENTATION_ROADMAP.md). Actualmente están listas las fundaciones principales, el claim/lease del worker y la primera iteración del catálogo. La migración del catálogo y su prueba de integración contra PostgreSQL siguen pendientes.
 
 ## Documentos
 

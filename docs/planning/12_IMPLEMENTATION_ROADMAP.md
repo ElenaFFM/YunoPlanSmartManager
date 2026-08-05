@@ -2,6 +2,23 @@
 
 El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimaciones se realizarán después de cerrar la decisión de identidad. Hosting y queue ya están definidos: web/worker en Render y PostgreSQL en Railway.
 
+## Estado de implementación
+
+**Última actualización:** 5 de agosto de 2026
+
+Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
+
+| Área | Estado actual |
+|---|---|
+| Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. |
+| Persistencia | Prisma configurado; migración inicial aplicada. La migración del catálogo está versionada y pendiente de aplicar en la PostgreSQL de pruebas. |
+| Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
+| Catálogo | Modelo, validaciones, altas y listados de bancos/plantillas implementados. CRUD completo, tarjetas y Amex siguen pendientes. |
+| Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
+| Yuno | Sin escrituras ni contract tests todavía. |
+
+Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durable (`83de4c5`) y catálogo (`248749f`, `a2f010f`, `ea52811`).
+
 ## Fase 0: Descubrimiento ejecutable y contratos
 
 ### Objetivos
@@ -12,16 +29,16 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ### Entregables
 
-- Proyecto Next.js mínimo desde cero.
-- Toolchain, lint, typecheck y tests.
-- Spike server-side contra sandbox.
-- Contract tests para los cinco endpoints.
-- Pruebas de prioridad, fechas, get all futuro y expiración.
-- ADR de topología Render/Railway, auth, SDK y calendario.
-- prueba de latencia y estabilidad desde Render hacia Railway PostgreSQL.
-- configuración y prueba de restore de backups/PITR en Railway.
-- verificación del desarrollo local contra una PostgreSQL remota exclusiva de pruebas.
-- modelo Prisma inicial revisado.
+- [x] Proyecto Next.js mínimo desde cero.
+- [x] Toolchain, lint, typecheck, tests y build.
+- [ ] Spike server-side contra sandbox.
+- [ ] Contract tests para los cinco endpoints.
+- [ ] Pruebas de prioridad, fechas, `get all` futuro y expiración.
+- [ ] ADRs pendientes de identidad, SDK y calendario. La topología Render/Railway ya está documentada.
+- [ ] Prueba de latencia y estabilidad desde Render hacia Railway PostgreSQL.
+- [ ] Configuración y prueba de restore de backups/PITR en Railway. Esto no implica restaurar la cuenta sandbox descartable.
+- [x] Desarrollo local conectado a una PostgreSQL remota exclusiva de pruebas.
+- [x] Modelo Prisma inicial y primera migración.
 
 ### Salida
 
@@ -29,15 +46,15 @@ No quedan supuestos críticos sobre el contrato remoto, la conexión cross-cloud
 
 ## Fase 1: Fundaciones
 
-- Estructura modular.
-- PostgreSQL/Prisma y migraciones.
-- Configuración validada por ambiente.
-- Autenticación server-side.
-- roles fijos `VIEWER | OPERATOR | ADMIN`.
-- esqueleto del worker y mecanismo de claim/lease sobre PostgreSQL.
-- audit writer.
-- CI.
-- observabilidad inicial.
+- [x] Estructura modular.
+- [x] PostgreSQL/Prisma y migración inicial.
+- [x] Configuración validada por ambiente usando `--env-file-if-exists`, sin `dotenv`.
+- [x] Roles fijos `VIEWER | OPERATOR | ADMIN` y autorización central para las rutas implementadas.
+- [x] Esqueleto del worker y mecanismo de claim/lease sobre PostgreSQL.
+- [ ] Autenticación server-side real para staging/producción. El header temporal está limitado a desarrollo/test.
+- [ ] Audit writer.
+- [ ] CI.
+- [ ] Observabilidad inicial más allá del health check y logs básicos.
 
 ### Salida
 
@@ -45,13 +62,20 @@ Usuario autenticado puede entrar y se comprueba autorización real por API.
 
 ## Fase 2: Catálogo y plantillas
 
-- CRUD seguro de bancos.
-- BINs únicos.
-- tarjetas de prueba.
-- plantillas versionadas.
-- cuatro rangos editables.
-- configuración inicial Amex.
-- desactivación sin efectos remotos.
+- [x] Modelo Prisma para bancos, BIN/IIN, plantillas y versiones.
+- [x] Alta y listado de bancos por API.
+- [x] Validación BIN/IIN numérico de 6 a 8 dígitos y sin duplicados en una misma solicitud.
+- [x] Restricción de un único propietario activo por BIN/IIN en la migración PostgreSQL.
+- [x] Alta y listado de plantillas `GENERAL` y `BANK`, con versión inicial y hash canónico.
+- [x] Cuatro rangos ARS editables, completos, contiguos y sin superposición; montos tratados con precisión de centavos.
+- [x] Sets de cuotas positivos, únicos, descendentes y con cuota `1`; tasa fija en `1`.
+- [x] Pruebas unitarias y prueba de integración preparada.
+- [ ] Aplicar la migración del catálogo en la base de pruebas y ejecutar la integración.
+- [ ] Completar edición, desactivación y archivo de bancos/BINs.
+- [ ] Crear nuevas versiones al editar plantillas y permitir su desactivación sin efectos remotos.
+- [ ] Tarjetas de prueba.
+- [ ] Configuración inicial Amex y su estructura especial.
+- [ ] Interfaz de usuario del catálogo.
 
 ### Salida
 
