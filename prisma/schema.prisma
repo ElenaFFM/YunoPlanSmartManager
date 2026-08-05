@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  VIEWER
+  OPERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum CampaignVersionStatus {
+  DRAFT
+  VALIDATED
+  SUPERSEDED
+}
+
+enum Environment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum DeploymentKind {
+  CANONICAL
+  TEST
+}
+
+enum DeploymentStatus {
+  PLANNED
+  READY
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RECONCILIATION_REQUIRED
+  CANCELLED
+}
+
+enum ExecutionRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  ROLLED_BACK
+  RECONCILIATION_REQUIRED
+  CANCELLED
+}
+
+enum OperationType {
+  CREATE
+  UPDATE
+  DELETE
+  VERIFY
+  COMPENSATE_CREATE
+  COMPENSATE_UPDATE
+  COMPENSATE_DELETE
+}
+
+enum OperationStatus {
+  PENDING
+  SENT
+  SUCCEEDED
+  FAILED
+  UNKNOWN
+  SKIPPED
+}
+
+enum ResultCertainty {
+  CONFIRMED
+  FAILED
+  UNKNOWN
+}
+
+model User {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  displayName String
+  role        UserRole   @default(VIEWER)
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  campaignsCreated Campaign[]        @relation("CampaignCreatedBy")
+  versionsCreated  CampaignVersion[] @relation("VersionCreatedBy")
+  deployments      Deployment[]      @relation("DeploymentCreatedBy")
+  runsRequested    ExecutionRun[]    @relation("RunRequestedBy")
+  approvals        Approval[]        @relation("ApprovalDecidedBy")
+}
+
+model Campaign {
+  id               String  @id @default(cuid())
+  name             String
+  description      String?
+  createdById      String
+  currentVersionId String? @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdBy      User             @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  currentVersion CampaignVersion? @relation("CurrentCampaignVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       CampaignVersion[] @relation("CampaignVersions")
+}
+
+model CampaignVersion {
+  id                    String                @id @default(cuid())
+  campaignId            String
+  versionNumber         Int
+  status                CampaignVersionStatus @default(DRAFT)
+  canonicalHash         String
+  changeReason          String
+  configurationSnapshot Json
+  createdById           String
+  createdAt             DateTime              @default(now())
+  supersededAt          DateTime?
+
+  campaign           Campaign     @relation("CampaignVersions", fields: [campaignId], references: [id])
+  currentForCampaign Campaign?    @relation("CurrentCampaignVersion")
+  createdBy          User         @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  deployments        Deployment[]
+  approvals          Approval[]
+
+  @@unique([campaignId, versionNumber])
+  @@index([status, createdAt])
+}
+
+model Deployment {
+  id               String           @id @default(cuid())
+  campaignVersionId String
+  environment      Environment
+  kind             DeploymentKind
+  status           DeploymentStatus @default(PLANNED)
+  configurationHash String
+  baseSnapshotHash String
+  scheduledAt      DateTime?
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  campaignVersion CampaignVersion @relation(fields: [campaignVersionId], references: [id])
+  createdBy       User            @relation("DeploymentCreatedBy", fields: [createdById], references: [id])
+  runs            ExecutionRun[]
+
+  @@index([environment, status, scheduledAt])
+}
+
+model ExecutionRun {
+  id                     String             @id @default(cuid())
+  deploymentId           String
+  status                 ExecutionRunStatus @default(QUEUED)
+  idempotencyKey         String             @unique
+  planHash               String
+  baseSnapshotHash       String
+  approvedPlanHash       String?
+  lockKey                String
+  queuedAt               DateTime           @default(now())
+  claimedAt              DateTime?
+  leaseOwner             String?
+  leaseExpiresAt         DateTime?
+  nextAttemptAt          DateTime?
+  startedAt              DateTime?
+  finishedAt             DateTime?
+  heartbeatAt            DateTime?
+  requestedById          String
+  failureClassification  String?
+  lastConfirmedOperation Int                @default(0)
+
+  deployment  Deployment           @relation(fields: [deploymentId], references: [id])
+  requestedBy User                 @relation("RunRequestedBy", fields: [requestedById], references: [id])
+  operations  ExecutionOperation[]
+  approvals   Approval[]
+
+  @@index([status, nextAttemptAt, queuedAt])
+  @@index([lockKey, status])
+}
+
+model ExecutionOperation {
+  id                      String          @id @default(cuid())
+  runId                   String
+  sequence                Int
+  type                    OperationType
+  status                  OperationStatus @default(PENDING)
+  targetRemotePlanId      String?
+  requestSnapshot         Json?
+  responseSnapshot        Json?
+  expectedResultSnapshot  Json?
+  compensationSnapshot    Json?
+  attemptCount            Int             @default(0)
+  startedAt               DateTime?
+  sentAt                  DateTime?
+  finishedAt              DateTime?
+  errorCode               String?
+  errorMessage            String?
+  resultCertainty         ResultCertainty?
+  compensationOperationId String?
+
+  run                   ExecutionRun        @relation(fields: [runId], references: [id])
+  compensationOperation ExecutionOperation? @relation("OperationCompensation", fields: [compensationOperationId], references: [id])
+  compensates           ExecutionOperation[] @relation("OperationCompensation")
+
+  @@unique([runId, sequence])
+  @@index([runId, status])
+}
+
+model Approval {
+  id                String   @id @default(cuid())
+  campaignVersionId String
+  executionRunId    String
+  planHash          String
+  decision          String
+  checklistSnapshot Json
+  warningsAccepted  Json?
+  decidedById       String
+  decidedAt         DateTime @default(now())
+  revokedAt         DateTime?
+  revocationReason  String?
+
+  campaignVersion CampaignVersion @relation(fields: [campaignVersionId], references: [id])
+  executionRun    ExecutionRun    @relation(fields: [executionRunId], references: [id])
+  decidedBy       User            @relation("ApprovalDecidedBy", fields: [decidedById], references: [id])
+
+  @@index([executionRunId, planHash, revokedAt])
+}
+

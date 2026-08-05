@@ -1,0 +1,43 @@
+{
+  "name": "yuno-plan-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "worker": "node --env-file-if-exists=.env --import tsx src/worker/main.ts",
+    "worker:dev": "node --env-file-if-exists=.env --import tsx --watch src/worker/main.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --experimental-test-isolation=none --test src/modules/planning/domain/installments.test.ts src/infrastructure/config/env.test.ts",
+    "test:watch": "node --experimental-strip-types --experimental-test-isolation=none --test --watch src/modules/planning/domain/installments.test.ts src/infrastructure/config/env.test.ts",
+    "prisma:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
+    "db:migrate:dev": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate dev",
+    "db:migrate:deploy": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "next": "16.3.0",
+    "pg": "8.22.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2",
+    "@types/pg": "8.20.4",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.0",
+    "prisma": "7.9.1",
+    "tsx": "4.23.8",
+    "typescript": "6.0.3"
+  }
+}
