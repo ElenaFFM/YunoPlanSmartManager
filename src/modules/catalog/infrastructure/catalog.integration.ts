@@ -6,10 +6,13 @@ import {
   createBank,
   createTemplate,
   createTemplateVersion,
+  createTestCard,
   updateBank,
   updateBankIinStatus,
   updateTemplate,
+  updateTestCardStatus,
 } from "../application/catalog-service";
+import { InvalidTemplateConfigurationError } from "../domain/template-configuration";
 
 const testId = `catalog-${Date.now()}`;
 const bankCode = `T${String(Date.now()).slice(-8)}`;
@@ -17,6 +20,8 @@ const iin = String(Date.now()).slice(-8);
 let userId: string | undefined;
 let bankId: string | undefined;
 let templateId: string | undefined;
+let amexTemplateId: string | undefined;
+let testCardId: string | undefined;
 
 try {
   const user = await prisma.user.create({
@@ -107,8 +112,70 @@ try {
     "la desactivación no debe alterar la versión vigente",
   );
 
+  const amexTemplate = await createTemplate({
+    name: `Amex ${testId}`,
+    scope: "AMEX",
+    ranges: [
+      { minAmount: "0", maxAmount: "199999.99", installments: [6, 1] },
+      { minAmount: "200000", maxAmount: "99999999", installments: [6, 1] },
+    ],
+    changeReason: "Configuración inicial Amex",
+    createdById: user.id,
+  });
+  amexTemplateId = amexTemplate.id;
+  assert.equal(amexTemplate.currentVersion?.versionNumber, 1);
+
+  const amexRevised = await createTemplateVersion(amexTemplateId, {
+    ranges: [
+      { minAmount: "0", maxAmount: "99999999", installments: [6, 1] },
+    ],
+    changeReason: "Consolidar Amex en un único tramo",
+    createdById: user.id,
+  });
+  assert.equal(
+    (amexRevised.currentVersion?.configurationSnapshot as { ranges: unknown[] }).ranges.length,
+    1,
+  );
+
+  await assert.rejects(
+    createTemplate({
+      name: `General inválida ${testId}`,
+      scope: "GENERAL",
+      ranges: [
+        { minAmount: "0", maxAmount: "199999.99", installments: [12, 6, 3, 1] },
+        { minAmount: "200000", maxAmount: "99999999", installments: [12, 6, 3, 1] },
+      ],
+      changeReason: "Debe fallar por cantidad de tramos",
+      createdById: user.id,
+    }),
+    (error) => error instanceof InvalidTemplateConfigurationError && error.code === "TPL-001",
+  );
+
+  const testCard = await createTestCard({
+    bankId,
+    label: `Tarjeta ${testId}`,
+    cardNumber: "4000000000000000",
+    iin: iin,
+  });
+  testCardId = testCard.id;
+  assert.equal(testCard.active, true);
+
+  const deactivatedCard = await updateTestCardStatus(testCardId, false);
+  assert.equal(deactivatedCard.active, false);
+
   console.log("Catalog integration test passed.");
 } finally {
+  if (testCardId) {
+    await prisma.testCard.delete({ where: { id: testCardId } });
+  }
+  if (amexTemplateId) {
+    await prisma.promotionTemplate.update({
+      where: { id: amexTemplateId },
+      data: { currentVersionId: null },
+    });
+    await prisma.templateVersion.deleteMany({ where: { templateId: amexTemplateId } });
+    await prisma.promotionTemplate.delete({ where: { id: amexTemplateId } });
+  }
   if (templateId) {
     await prisma.promotionTemplate.update({
       where: { id: templateId },

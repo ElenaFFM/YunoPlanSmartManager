@@ -7,6 +7,7 @@ import {
   type CatalogStatus,
   type Template,
   type TemplateRange,
+  type TemplateScope,
   CatalogApiError,
   createTemplate,
   createTemplateVersion,
@@ -21,6 +22,17 @@ const DEFAULT_RANGES: TemplateRange[] = [
   { minAmount: "1000000", maxAmount: "2299999.99", installments: [9, 6, 3, 1] },
   { minAmount: "2300000", maxAmount: "99999999", installments: [6, 3, 1] },
 ];
+
+const AMEX_DEFAULT_RANGES: TemplateRange[] = [
+  { minAmount: "0", maxAmount: "199999.99", installments: [6, 1] },
+  { minAmount: "200000", maxAmount: "99999999", installments: [6, 1] },
+];
+
+const SCOPE_LABEL: Record<TemplateScope, string> = {
+  GENERAL: "General",
+  BANK: "Banco",
+  AMEX: "Amex",
+};
 
 const TEMPLATE_STATUS_TRANSITIONS: Record<CatalogStatus, CatalogStatus[]> = {
   ACTIVE: ["INACTIVE", "ARCHIVED"],
@@ -121,6 +133,70 @@ export default function PlantillasPage() {
   );
 }
 
+function RangeEditor({
+  ranges,
+  onChange,
+  flexible,
+}: {
+  ranges: TemplateRange[];
+  onChange: (ranges: TemplateRange[]) => void;
+  flexible: boolean;
+}) {
+  function updateRange(index: number, patch: Partial<TemplateRange>) {
+    onChange(ranges.map((range, i) => (i === index ? { ...range, ...patch } : range)));
+  }
+
+  return (
+    <>
+      {ranges.map((range, index) => (
+        <div className="range-row" key={index}>
+          <input
+            value={range.minAmount}
+            onChange={(event) => updateRange(index, { minAmount: event.target.value })}
+            placeholder="Mínimo"
+          />
+          <input
+            value={range.maxAmount}
+            onChange={(event) => updateRange(index, { maxAmount: event.target.value })}
+            placeholder="Máximo"
+          />
+          <input
+            value={range.installments.join(",")}
+            onChange={(event) =>
+              updateRange(index, {
+                installments: event.target.value
+                  .split(",")
+                  .map((value) => Number(value.trim()))
+                  .filter((value) => Number.isFinite(value)),
+              })
+            }
+            placeholder="Cuotas (12,6,3,1)"
+          />
+          {flexible && (
+            <button
+              type="button"
+              className="secondary"
+              disabled={ranges.length <= 1}
+              onClick={() => onChange(ranges.filter((_, i) => i !== index))}
+            >
+              Quitar
+            </button>
+          )}
+        </div>
+      ))}
+      {flexible && (
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => onChange([...ranges, { minAmount: "", maxAmount: "", installments: [1] }])}
+        >
+          Agregar tramo
+        </button>
+      )}
+    </>
+  );
+}
+
 function TemplateCard({
   template,
   banks,
@@ -148,12 +224,12 @@ function TemplateCard({
       </div>
       <p>{template.description || "Sin descripción."}</p>
       <p className="muted">
-        Alcance:{" "}
-        {template.scope === "GENERAL"
-          ? "General"
-          : `Banco (${template.currentVersion?.bank?.name ?? "-"})`}
+        Alcance: {SCOPE_LABEL[template.scope]}
+        {template.scope === "BANK" && ` (${template.currentVersion?.bank?.name ?? "-"})`}
         {" · "}
         Versión {template.currentVersion?.versionNumber ?? "-"}
+        {" · "}
+        {template.currentVersion?.configurationSnapshot.ranges.length ?? "-"} tramo(s)
       </p>
 
       {canWrite && TEMPLATE_STATUS_TRANSITIONS[template.status].length > 0 && (
@@ -210,10 +286,6 @@ function NewVersionForm({
     template.currentVersion?.configurationSnapshot.ranges ?? DEFAULT_RANGES,
   );
 
-  function updateRange(index: number, patch: Partial<TemplateRange>) {
-    setRanges((current) => current.map((range, i) => (i === index ? { ...range, ...patch } : range)));
-  }
-
   return (
     <form
       className="form"
@@ -243,32 +315,7 @@ function NewVersionForm({
         Motivo del cambio
         <input value={changeReason} onChange={(event) => setChangeReason(event.target.value)} required />
       </label>
-      {ranges.map((range, index) => (
-        <div className="range-row" key={index}>
-          <input
-            value={range.minAmount}
-            onChange={(event) => updateRange(index, { minAmount: event.target.value })}
-            placeholder="Mínimo"
-          />
-          <input
-            value={range.maxAmount}
-            onChange={(event) => updateRange(index, { maxAmount: event.target.value })}
-            placeholder="Máximo"
-          />
-          <input
-            value={range.installments.join(",")}
-            onChange={(event) =>
-              updateRange(index, {
-                installments: event.target.value
-                  .split(",")
-                  .map((value) => Number(value.trim()))
-                  .filter((value) => Number.isFinite(value)),
-              })
-            }
-            placeholder="Cuotas (12,6,3,1)"
-          />
-        </div>
-      ))}
+      <RangeEditor ranges={ranges} onChange={setRanges} flexible={template.scope === "AMEX"} />
       <button type="submit" disabled={disabled}>
         Guardar nueva versión
       </button>
@@ -286,7 +333,7 @@ function CreateTemplateForm({
   onSubmit: (input: {
     name: string;
     description?: string;
-    scope: "GENERAL" | "BANK";
+    scope: TemplateScope;
     bankId?: string;
     ranges: TemplateRange[];
     changeReason: string;
@@ -294,15 +341,14 @@ function CreateTemplateForm({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [scope, setScope] = useState<"GENERAL" | "BANK">("GENERAL");
+  const [scope, setScope] = useState<TemplateScope>("GENERAL");
   const [bankId, setBankId] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [ranges, setRanges] = useState<TemplateRange[]>(DEFAULT_RANGES);
 
-  function updateRange(index: number, patch: Partial<TemplateRange>) {
-    setRanges((current) =>
-      current.map((range, i) => (i === index ? { ...range, ...patch } : range)),
-    );
+  function changeScope(next: TemplateScope) {
+    setScope(next);
+    setRanges(next === "AMEX" ? AMEX_DEFAULT_RANGES : DEFAULT_RANGES);
   }
 
   return (
@@ -331,9 +377,10 @@ function CreateTemplateForm({
       </label>
       <label>
         Alcance
-        <select value={scope} onChange={(event) => setScope(event.target.value as "GENERAL" | "BANK")}>
+        <select value={scope} onChange={(event) => changeScope(event.target.value as TemplateScope)}>
           <option value="GENERAL">General</option>
           <option value="BANK">Banco</option>
+          <option value="AMEX">Amex</option>
         </select>
       </label>
       {scope === "BANK" && (
@@ -359,32 +406,7 @@ function CreateTemplateForm({
       </label>
 
       <h3>Rangos ARS</h3>
-      {ranges.map((range, index) => (
-        <div className="range-row" key={index}>
-          <input
-            value={range.minAmount}
-            onChange={(event) => updateRange(index, { minAmount: event.target.value })}
-            placeholder="Mínimo"
-          />
-          <input
-            value={range.maxAmount}
-            onChange={(event) => updateRange(index, { maxAmount: event.target.value })}
-            placeholder="Máximo"
-          />
-          <input
-            value={range.installments.join(",")}
-            onChange={(event) =>
-              updateRange(index, {
-                installments: event.target.value
-                  .split(",")
-                  .map((value) => Number(value.trim()))
-                  .filter((value) => Number.isFinite(value)),
-              })
-            }
-            placeholder="Cuotas (12,6,3,1)"
-          />
-        </div>
-      ))}
+      <RangeEditor ranges={ranges} onChange={setRanges} flexible={scope === "AMEX"} />
 
       <button type="submit" disabled={disabled}>
         Crear plantilla

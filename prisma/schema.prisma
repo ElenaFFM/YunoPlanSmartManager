@@ -32,6 +32,7 @@ enum IinStatus {
 enum TemplateScope {
   GENERAL
   BANK
+  AMEX
 }
 
 enum CampaignVersionStatus {
@@ -124,6 +125,7 @@ model Bank {
 
   iins             BankIin[]
   templateVersions TemplateVersion[]
+  testCards        TestCard[]
 
   @@index([status, name])
 }
@@ -142,6 +144,21 @@ model BankIin {
 
   @@index([bankId, status])
   @@index([value, status])
+}
+
+model TestCard {
+  id         String   @id @default(cuid())
+  bankId     String?
+  label      String
+  cardNumber String
+  iin        String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  bank Bank? @relation(fields: [bankId], references: [id])
+
+  @@index([bankId, active])
 }
 
 model PromotionTemplate {

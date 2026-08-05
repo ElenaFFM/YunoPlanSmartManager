@@ -34,13 +34,25 @@ export type TemplateVersion = {
   configurationSnapshot: { ranges: TemplateRange[] };
 };
 
+export type TemplateScope = "GENERAL" | "BANK" | "AMEX";
+
 export type Template = {
   id: string;
   name: string;
   description: string | null;
-  scope: "GENERAL" | "BANK";
+  scope: TemplateScope;
   status: CatalogStatus;
   currentVersion: TemplateVersion | null;
+};
+
+export type TestCard = {
+  id: string;
+  bankId: string | null;
+  bank: Bank | null;
+  label: string;
+  cardNumber: string;
+  iin: string;
+  active: boolean;
 };
 
 export class CatalogApiError extends Error {
@@ -143,7 +155,7 @@ export function createTemplate(
   input: {
     name: string;
     description?: string;
-    scope: "GENERAL" | "BANK";
+    scope: TemplateScope;
     bankId?: string;
     ranges: TemplateRange[];
     changeReason: string;
@@ -152,5 +164,26 @@ export function createTemplate(
   return apiFetch<Template>(userId, "/api/catalog/templates", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function listTestCards(userId: string) {
+  return apiFetch<TestCard[]>(userId, "/api/catalog/test-cards");
+}
+
+export function createTestCard(
+  userId: string,
+  input: { bankId?: string; label: string; cardNumber: string; iin: string },
+) {
+  return apiFetch<TestCard>(userId, "/api/catalog/test-cards", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTestCardStatus(userId: string, testCardId: string, active: boolean) {
+  return apiFetch<TestCard>(userId, `/api/catalog/test-cards/${testCardId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ active }),
   });
 }

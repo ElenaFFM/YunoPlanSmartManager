@@ -8,11 +8,11 @@ El repositorio está en desarrollo. La documentación funcional y técnica vive 
 
 - Aplicación Next.js, Prisma, validación de ambiente y worker Node.js separados.
 - Queue PostgreSQL con claim/lease durable; el worker todavía no escribe en Yuno.
-- Modelo, reglas de dominio y API del catálogo para bancos, BIN/IIN y plantillas, incluyendo edición y desactivación/archivo de bancos y BINs.
-- Interfaz mínima de catálogo (`/catalog/bancos`, `/catalog/plantillas`) para probar altas, ediciones y cambios de estado con el usuario de desarrollo.
+- Catálogo completo (Fase 2): bancos, BIN/IIN, plantillas `GENERAL`/`BANK`/`AMEX` con versionado inmutable, y tarjetas de prueba — con altas, edición, desactivación/archivo y API.
+- Interfaz mínima de catálogo (`/catalog/bancos`, `/catalog/plantillas`, `/catalog/tarjetas`) para probar todo lo anterior con el usuario de desarrollo.
 - Migración del catálogo aplicada en la PostgreSQL de pruebas; integración de catálogo y de queue verificadas.
-- 16 pruebas unitarias, lint, typecheck y build verificados.
-- Autenticación productiva, nuevas versiones de plantillas, tarjetas/Amex, e integración con Yuno pendientes.
+- 17 pruebas unitarias, lint, typecheck y build verificados.
+- Autenticación productiva e integración con Yuno pendientes (Fase 0/1/3 en adelante).
 
 ## Requisitos
 

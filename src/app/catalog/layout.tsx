@@ -11,6 +11,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
         <nav className="tabs">
           <Link href="/catalog/bancos">Bancos y BIN/IIN</Link>
           <Link href="/catalog/plantillas">Plantillas</Link>
+          <Link href="/catalog/tarjetas">Tarjetas de prueba</Link>
         </nav>
         <IdentityBadge />
         {children}

@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 5 de agosto de 2026 (migración del catálogo aplicada e integraciones verificadas)
+**Última actualización:** 5 de agosto de 2026 (Fase 2 completa: tarjetas de prueba y scope Amex agregados)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -13,7 +13,7 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 | Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. |
 | Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
 | Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
-| Catálogo | Modelo, validaciones, altas, listados, edición y desactivación/archivo de bancos, BINs y plantillas (con versionado inmutable) implementados, con interfaz mínima para probarlos. Tarjetas y Amex siguen pendientes. |
+| Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
 | Yuno | Sin escrituras ni contract tests todavía. |
 
@@ -73,9 +73,9 @@ Usuario autenticado puede entrar y se comprueba autorización real por API.
 - [x] Aplicar la migración del catálogo en la base de pruebas y ejecutar la integración.
 - [x] Completar edición, desactivación y archivo de bancos/BINs.
 - [x] Crear nuevas versiones al editar plantillas y permitir su desactivación sin efectos remotos.
-- [ ] Tarjetas de prueba.
-- [ ] Configuración inicial Amex y su estructura especial.
-- [x] Interfaz de usuario mínima del catálogo (altas, edición y estados de bancos/BINs; alta y listado de plantillas) usando el usuario `ADMIN` de desarrollo.
+- [x] Tarjetas de prueba (`TestCard`): alta, listado y activar/desactivar, número en texto plano (D-023).
+- [x] Configuración inicial Amex y su estructura especial: scope `AMEX` con cantidad de tramos libre (D-022), inicial `[6, 1]` en dos tramos.
+- [x] Interfaz de usuario mínima del catálogo (altas, edición y estados de bancos/BINs; alta, edición y versionado de plantillas incluyendo Amex; tarjetas de prueba) usando el usuario `ADMIN` de desarrollo.
 
 ### Salida
 

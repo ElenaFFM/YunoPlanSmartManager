@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { CatalogStatus, IinStatus, Prisma, type TemplateScope } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
-import { normalizeUniqueIins } from "../domain/iin";
+import { normalizeIin, normalizeUniqueIins } from "../domain/iin";
 import {
   createTemplateConfiguration,
+  TEMPLATE_RANGE_COUNT,
   type TemplateRangeInput,
 } from "../domain/template-configuration";
 
@@ -56,12 +57,22 @@ const TEMPLATE_STATUS_TRANSITIONS: Record<CatalogStatus, readonly CatalogStatus[
   ARCHIVED: [],
 };
 
+function validateTemplateBankAssociation(scope: TemplateScope, bankId: string | undefined) {
+  if (scope === "BANK" && !bankId) {
+    throw new CatalogInputError("CAT-TPL-002", "Una plantilla bancaria requiere un banco.");
+  }
+  if (scope !== "BANK" && bankId) {
+    throw new CatalogInputError("CAT-TPL-002", "Solo una plantilla bancaria puede indicar un banco.");
+  }
+}
+
 function buildTemplateSnapshot(
   scope: TemplateScope,
   bankId: string | undefined,
   ranges: readonly TemplateRangeInput[],
 ) {
-  const configuration = createTemplateConfiguration(ranges);
+  const requiredRangeCount = scope === "AMEX" ? null : TEMPLATE_RANGE_COUNT;
+  const configuration = createTemplateConfiguration(ranges, undefined, requiredRangeCount);
   const configurationSnapshot = JSON.parse(
     JSON.stringify(configuration),
   ) as Prisma.InputJsonValue;
@@ -207,12 +218,7 @@ export async function createTemplate(input: CreateTemplateInput) {
   if (!changeReason) {
     throw new CatalogInputError("CAT-TPL-001", "El motivo de creación es obligatorio.");
   }
-  if (input.scope === "BANK" && !input.bankId) {
-    throw new CatalogInputError("CAT-TPL-002", "Una plantilla bancaria requiere un banco.");
-  }
-  if (input.scope === "GENERAL" && input.bankId) {
-    throw new CatalogInputError("CAT-TPL-002", "La plantilla General no debe indicar un banco.");
-  }
+  validateTemplateBankAssociation(input.scope, input.bankId);
 
   const { configurationSnapshot, canonicalHash } = buildTemplateSnapshot(
     input.scope,
@@ -308,12 +314,7 @@ export async function createTemplateVersion(
     throw new CatalogInputError("CAT-TPL-404", "La plantilla indicada no existe.", 404);
   }
 
-  if (template.scope === "BANK" && !input.bankId) {
-    throw new CatalogInputError("CAT-TPL-002", "Una plantilla bancaria requiere un banco.");
-  }
-  if (template.scope === "GENERAL" && input.bankId) {
-    throw new CatalogInputError("CAT-TPL-002", "La plantilla General no debe indicar un banco.");
-  }
+  validateTemplateBankAssociation(template.scope, input.bankId);
 
   const { configurationSnapshot, canonicalHash } = buildTemplateSnapshot(
     template.scope,
@@ -341,6 +342,60 @@ export async function createTemplateVersion(
       data: { currentVersionId: version.id },
       include: { currentVersion: { include: { bank: true } } },
     });
+  });
+}
+
+export type CreateTestCardInput = {
+  bankId?: string;
+  label: string;
+  cardNumber: string;
+  iin: string;
+};
+
+export async function listTestCards() {
+  return prisma.testCard.findMany({
+    orderBy: { label: "asc" },
+    include: { bank: true },
+  });
+}
+
+export async function createTestCard(input: CreateTestCardInput) {
+  const label = input.label.trim();
+  const cardNumber = input.cardNumber.trim();
+  const iin = normalizeIin(input.iin);
+
+  if (!label) {
+    throw new CatalogInputError("CAT-CARD-001", "La etiqueta de la tarjeta es obligatoria.");
+  }
+  if (!/^\d{12,19}$/.test(cardNumber)) {
+    throw new CatalogInputError(
+      "CAT-CARD-001",
+      "El número de tarjeta debe tener entre 12 y 19 dígitos.",
+    );
+  }
+  if (input.bankId) {
+    const bank = await prisma.bank.findUnique({ where: { id: input.bankId } });
+    if (!bank) {
+      throw new CatalogInputError("CAT-CARD-002", "El banco indicado no existe.", 404);
+    }
+  }
+
+  return prisma.testCard.create({
+    data: { bankId: input.bankId, label, cardNumber, iin },
+    include: { bank: true },
+  });
+}
+
+export async function updateTestCardStatus(testCardId: string, active: boolean) {
+  const testCard = await prisma.testCard.findUnique({ where: { id: testCardId } });
+  if (!testCard) {
+    throw new CatalogInputError("CAT-CARD-404", "La tarjeta de prueba indicada no existe.", 404);
+  }
+
+  return prisma.testCard.update({
+    where: { id: testCardId },
+    data: { active },
+    include: { bank: true },
   });
 }
 

@@ -217,9 +217,16 @@ button.secondary {
 }
 
 .range-row {
+  align-items: center;
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: 1fr 1fr 1.4fr;
+  grid-template-columns: 1fr 1fr 1.4fr auto;
+}
+
+.range-row input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
 }
 
 .muted {

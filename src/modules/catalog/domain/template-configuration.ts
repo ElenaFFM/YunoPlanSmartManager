@@ -35,11 +35,21 @@ export class InvalidTemplateConfigurationError extends Error {
 export function createTemplateConfiguration(
   ranges: readonly TemplateRangeInput[],
   maximumAmount = TEMPLATE_MAX_AMOUNT,
+  // `undefined` (the default) enforces the fixed bank/General count; pass `null`
+  // explicitly for scopes like Amex that allow any positive number of ranges.
+  requiredRangeCount: number | null = TEMPLATE_RANGE_COUNT,
 ): TemplateConfiguration {
-  if (ranges.length !== TEMPLATE_RANGE_COUNT) {
+  if (requiredRangeCount !== null && ranges.length !== requiredRangeCount) {
     throw new InvalidTemplateConfigurationError(
       "TPL-001",
-      "La plantilla debe contener exactamente cuatro tramos.",
+      `La plantilla debe contener exactamente ${requiredRangeCount} tramos.`,
+    );
+  }
+
+  if (requiredRangeCount === null && ranges.length === 0) {
+    throw new InvalidTemplateConfigurationError(
+      "TPL-001",
+      "La plantilla debe contener al menos un tramo.",
     );
   }
 

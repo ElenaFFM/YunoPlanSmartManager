@@ -33,7 +33,7 @@ const rangeSchema = z.object({
 export const createTemplateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  scope: z.enum(["GENERAL", "BANK"]),
+  scope: z.enum(["GENERAL", "BANK", "AMEX"]),
   bankId: z.string().min(1).optional(),
   ranges: z.array(rangeSchema),
   changeReason: z.string().min(1).max(500),
@@ -49,6 +49,17 @@ export const createTemplateVersionSchema = z.object({
   bankId: z.string().min(1).optional(),
   ranges: z.array(rangeSchema),
   changeReason: z.string().min(1).max(500),
+});
+
+export const createTestCardSchema = z.object({
+  bankId: z.string().min(1).optional(),
+  label: z.string().min(1).max(100),
+  cardNumber: z.string().min(1).max(19),
+  iin: z.string().min(1),
+});
+
+export const updateTestCardStatusSchema = z.object({
+  active: z.boolean(),
 });
 
 export function catalogErrorResponse(error: unknown) {

@@ -76,4 +76,27 @@ describe("template configuration", () => {
         error instanceof InvalidTemplateConfigurationError && error.code === "TPL-002",
     );
   });
+
+  it("allows a flexible range count for scopes like Amex", () => {
+    const amexRanges: readonly TemplateRangeInput[] = [
+      { minAmount: "0", maxAmount: "199999.99", installments: [6, 1] },
+      { minAmount: "200000", maxAmount: "99999999", installments: [6, 1] },
+    ];
+
+    const configuration = createTemplateConfiguration(amexRanges, undefined, null);
+    assert.equal(configuration.ranges.length, 2);
+
+    const singleRange = createTemplateConfiguration(
+      [{ minAmount: "0", maxAmount: "99999999", installments: [1] }],
+      undefined,
+      null,
+    );
+    assert.equal(singleRange.ranges.length, 1);
+
+    assert.throws(
+      () => createTemplateConfiguration([], undefined, null),
+      (error) =>
+        error instanceof InvalidTemplateConfigurationError && error.code === "TPL-001",
+    );
+  });
 });

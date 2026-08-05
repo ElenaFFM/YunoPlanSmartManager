@@ -12,7 +12,7 @@ Este documento evita convertir supuestos en implementación. Cada punto cerrado 
 ### Amex
 
 Confirmado que sus cuotas no quedan bloqueadas.  
-**Pendiente:** definir si Amex conserva siempre dos rangos o puede cambiar libremente la cantidad, además de límites y cuotas.
+**Cerrada (2026-08-05):** Amex no tiene una cantidad fija de tramos. El `ADMIN` puede agregar o quitar tramos libremente; la única regla estructural heredada de bancos/General es que la cobertura sea contigua, sin huecos ni cruces, desde `$0` hasta `$99.999.999`. La configuración inicial sigue siendo dos tramos con `[6, 1]`, pero es solo un punto de partida editable.
 
 ### Ediciones directas
 
@@ -96,6 +96,10 @@ Los datos se suministrarán cuando sean necesarios.
 
 **Pendiente técnico:** precisión/escala exacta aceptada por Yuno y semántica inclusiva de min/max.
 
+### Tarjetas de prueba (`TestCard`)
+
+**Cerrada (2026-08-05):** el número de tarjeta se guarda en texto plano. Son números ficticios de la cuenta sandbox descartable de Yuno, no PANs reales de un titular, por lo que el cifrado en reposo no aporta protección real y sí agrega complejidad de gestión de claves. Igual se tratan como dato controlado: la UI evita exponerlos innecesariamente y la auditoría los registra como tales.
+
 ## 6. Contrato Yuno a verificar
 
 - `get all` devuelve solo activos y comportamiento exacto en límites.
@@ -134,3 +138,5 @@ Los datos se suministrarán cuando sean necesarios.
 | D-019 | Sandbox | Cerrada | Cuenta descartable; baseline conocido por ensayo; sin restauración |
 | D-020 | Progreso UI | Cerrada | Polling HTTP para MVP |
 | D-021 | Desarrollo DB | Cerrada | PostgreSQL remota exclusiva de pruebas; sin PostgreSQL local obligatorio |
+| D-022 | Rangos Amex | Cerrada | Cantidad de tramos libre para el `ADMIN`; misma regla de cobertura contigua que bancos/General |
+| D-023 | Tarjetas de prueba | Cerrada | Número en texto plano; datos ficticios de sandbox, tratados como controlados en la UI/auditoría |
