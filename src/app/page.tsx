@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const foundations = [
   {
     title: "Dominio aislado",
@@ -30,6 +32,9 @@ export default function Home() {
           </article>
         ))}
       </section>
+      <p style={{ marginTop: "2rem" }}>
+        <Link href="/catalog/bancos">Ir al catálogo →</Link>
+      </p>
     </main>
   );
 }

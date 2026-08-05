@@ -19,6 +19,7 @@
     "test:integration:catalog": "node --env-file=.env --import tsx src/modules/catalog/infrastructure/catalog.integration.ts",
     "test:integration:queue": "node --env-file=.env --import tsx src/modules/executions/infrastructure/execution-run-queue.integration.ts",
     "prisma:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
+    "db:seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts",
     "db:migrate:dev": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate dev",
     "db:migrate:deploy": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate deploy"
   },

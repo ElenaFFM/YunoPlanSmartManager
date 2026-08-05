@@ -9,9 +9,10 @@ El repositorio está en desarrollo. La documentación funcional y técnica vive 
 - Aplicación Next.js, Prisma, validación de ambiente y worker Node.js separados.
 - Queue PostgreSQL con claim/lease durable; el worker todavía no escribe en Yuno.
 - Modelo, reglas de dominio y API del catálogo para bancos, BIN/IIN y plantillas, incluyendo edición y desactivación/archivo de bancos y BINs.
+- Interfaz mínima de catálogo (`/catalog/bancos`, `/catalog/plantillas`) para probar altas, ediciones y cambios de estado con el usuario de desarrollo.
 - Migración del catálogo aplicada en la PostgreSQL de pruebas; integración de catálogo y de queue verificadas.
 - 16 pruebas unitarias, lint, typecheck y build verificados.
-- Autenticación productiva, nuevas versiones de plantillas, tarjetas/Amex, interfaz y conexión Yuno pendientes.
+- Autenticación productiva, nuevas versiones de plantillas, tarjetas/Amex, e integración con Yuno pendientes.
 
 ## Requisitos
 
@@ -51,6 +52,14 @@ El worker inicial solo observa la queue. No realiza escrituras sobre Yuno hasta 
 Hasta elegir el proveedor de identidad, las rutas del catálogo aceptan `x-yuno-user-id` únicamente con `APP_ENV=development` o `test`. El usuario debe existir, estar activo y tener uno de los tres roles fijos; las escrituras del catálogo requieren `ADMIN`.
 
 Este mecanismo queda deshabilitado en staging y producción. Allí las rutas responden como no disponibles hasta conectar una sesión server-side real.
+
+Para probar la interfaz localmente hace falta un usuario `ADMIN` fijo en la base de pruebas:
+
+```powershell
+npm.cmd run db:seed
+```
+
+Esto crea (o reutiliza) `dev-admin@yuno-plan-manager.local`. Las páginas bajo `/catalog` lo obtienen automáticamente desde `GET /api/dev/identity` y lo usan para todas las llamadas — no requiere login manual mientras `APP_ENV=development`.
 
 ## Verificación
 
