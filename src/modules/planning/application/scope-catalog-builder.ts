@@ -29,6 +29,26 @@ export class InconsistentScopeCatalogError extends Error {
   }
 }
 
+/**
+ * `validateCampaignConfiguration` (CMP-005/CMP-006) solo detecta superposición
+ * *dentro* de una misma campaña. Dos campañas distintas que se pisen sobre el
+ * mismo alcance/tramo no se validan ahí, y `projectInstallmentTimeline` aplica
+ * las reglas en el orden en que se le pasan: para transformaciones que no
+ * conmutan (p. ej. `CAP_MAX_INSTALLMENT` + `ADD_EXACT_INSTALLMENTS` vigentes al
+ * mismo tiempo), ese orden cambia el resultado de cuotas de forma silenciosa.
+ * Se rechaza explícitamente en vez de dejar que el orden de carga decida.
+ */
+export class OverlappingCampaignsError extends Error {
+  readonly code: string;
+  readonly status = 409;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "OverlappingCampaignsError";
+    this.code = code;
+  }
+}
+
 export type BuildScopeCatalogOptions = {
   /**
    * Estados de `CampaignVersion` a incluir en la proyección. Por defecto solo
@@ -171,6 +191,46 @@ export async function loadRangeIndexesByTarget(
   return result;
 }
 
+type RuleContribution = { campaignId: string; rule: TemporalRule };
+
+/** Mismo criterio de intervalo semiabierto que `timeline.ts`/`campaign.ts`. */
+function windowsOverlap(left: TemporalRule["window"], right: TemporalRule["window"]): boolean {
+  const leftEndsAfterRightStarts = left.endAt === null || left.endAt > right.startAt;
+  const rightEndsAfterLeftStarts = right.endAt === null || right.endAt > left.startAt;
+  return leftEndsAfterRightStarts && rightEndsAfterLeftStarts;
+}
+
+/**
+ * Cualquier superposición encontrada acá es necesariamente entre campañas
+ * distintas: dentro de una misma campaña ya la rechazó
+ * `validateCampaignConfiguration` (CMP-005/CMP-006) al guardarla.
+ */
+function assertNoCrossCampaignOverlap(
+  target: CampaignTarget,
+  rangeIndex: number,
+  contributions: readonly RuleContribution[],
+): void {
+  for (let i = 0; i < contributions.length; i += 1) {
+    for (let j = i + 1; j < contributions.length; j += 1) {
+      const left = contributions[i];
+      const right = contributions[j];
+
+      if (left.campaignId === right.campaignId) {
+        continue;
+      }
+      if (!windowsOverlap(left.rule.window, right.rule.window)) {
+        continue;
+      }
+
+      throw new OverlappingCampaignsError(
+        target.type === "GENERAL" ? "CMP-006" : "CMP-005",
+        `Las campañas ${left.campaignId} y ${right.campaignId} tienen vigencias superpuestas ` +
+          `sobre el tramo ${rangeIndex} de "${campaignTargetKey(target)}".`,
+      );
+    }
+  }
+}
+
 /**
  * El orden de las reglas es la prioridad en `projectInstallmentTimeline`, así que
  * se ordena por inicio para que el resultado sea determinista entre campañas.
@@ -181,11 +241,18 @@ function buildRangeTimelines(
   campaigns: readonly LoadedCampaign[],
 ): readonly ScopedRangeTimeline[] {
   return ranges.map((range) => {
-    const rules: TemporalRule[] = campaigns.flatMap((campaign) => [
-      ...buildTemporalRules(campaign.configuration, target, range.index),
-    ]);
+    const contributions: RuleContribution[] = campaigns.flatMap((campaign) =>
+      buildTemporalRules(campaign.configuration, target, range.index).map((rule) => ({
+        campaignId: campaign.campaignId,
+        rule,
+      })),
+    );
 
-    rules.sort((left, right) => left.window.startAt.getTime() - right.window.startAt.getTime());
+    assertNoCrossCampaignOverlap(target, range.index, contributions);
+
+    const rules = contributions
+      .map((contribution) => contribution.rule)
+      .sort((left, right) => left.window.startAt.getTime() - right.window.startAt.getTime());
 
     return {
       range: { minAmount: range.minAmount, maxAmount: range.maxAmount },

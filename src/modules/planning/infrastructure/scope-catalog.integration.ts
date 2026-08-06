@@ -5,6 +5,7 @@ import { createCampaign } from "../application/campaign-service";
 import {
   buildScopeCatalog,
   InconsistentScopeCatalogError,
+  OverlappingCampaignsError,
   resolveEffectiveConfigurationFor,
 } from "../application/scope-catalog-builder";
 import type { CampaignSegment } from "../domain/campaign";
@@ -227,7 +228,38 @@ try {
   });
   assert.deepEqual(withDraft.installments, [12, 1], "con includeDrafts el borrador sí aplica");
 
-  // 5. Dos plantillas General activas es una inconsistencia explícita.
+  // 5. Dos campañas distintas con vigencias superpuestas sobre el mismo alcance
+  // y tramo se rechazan explícitamente: `validateCampaignConfiguration`
+  // (CMP-005/CMP-006) solo detecta superposición dentro de una misma campaña.
+  const overlapping = await createCampaign({
+    name: `Superpuesta ${testId}`,
+    changeReason: "Debe chocar con la campaña vigente",
+    segments: [
+      {
+        id: "seg-bank-top-overlap",
+        target: { type: "BANK", bankId: bank.id },
+        // Se solapa con [CAMPAIGN_START, CAMPAIGN_END) del paso 2.
+        startAt: new Date("2026-09-10T00:00:00-03:00"),
+        endAt: new Date("2026-09-20T00:00:00-03:00"),
+        rangeChanges: [
+          { rangeIndex: 4, transformation: { type: "ADD_EXACT_INSTALLMENTS", additions: [24] } },
+        ],
+      },
+    ],
+    createdById: user.id,
+  });
+  campaignIds.push(overlapping.campaign.id);
+  await prisma.campaignVersion.updateMany({
+    where: { campaignId: overlapping.campaign.id },
+    data: { status: "VALIDATED" },
+  });
+
+  await assert.rejects(
+    buildScopeCatalog(),
+    (error) => error instanceof OverlappingCampaignsError && error.code === "CMP-005",
+  );
+
+  // 6. Dos plantillas General activas es una inconsistencia explícita.
   const duplicateGeneral = await createTemplate({
     name: `General duplicada ${testId}`,
     scope: "GENERAL",

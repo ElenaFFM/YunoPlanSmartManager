@@ -3,7 +3,10 @@ import { ZodError, z } from "zod";
 import { AuthorizationError } from "@/modules/identity/application/authorize-request";
 import { CampaignInputError } from "../application/campaign-service";
 import { InvalidCampaignSnapshotError } from "../application/campaign-snapshot";
-import { InconsistentScopeCatalogError } from "../application/scope-catalog-builder";
+import {
+  InconsistentScopeCatalogError,
+  OverlappingCampaignsError,
+} from "../application/scope-catalog-builder";
 import { InvalidTemplateSnapshotError } from "../application/template-snapshot";
 import { InvalidScopeCatalogError } from "../domain/catalog-validation";
 import { NoMatchingRangeError } from "../domain/effective-configuration";
@@ -52,7 +55,10 @@ export function planningErrorResponse(error: unknown) {
     );
   }
 
-  if (error instanceof InconsistentScopeCatalogError) {
+  if (
+    error instanceof InconsistentScopeCatalogError ||
+    error instanceof OverlappingCampaignsError
+  ) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },
