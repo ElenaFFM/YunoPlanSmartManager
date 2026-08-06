@@ -71,10 +71,24 @@ export type YunoClientConfig = {
   privateSecretKey: string;
 };
 
+export type RetrieveAllInstallmentPlansFilters = {
+  currency?: string;
+  iin?: string;
+  amount?: string;
+};
+
 export type YunoInstallmentPlansClient = {
   create(input: CreateInstallmentPlanInput): Promise<YunoInstallmentPlan>;
   retrieve(planId: string): Promise<YunoInstallmentPlan>;
-  retrieveAll(accountId: string): Promise<YunoInstallmentPlan[]>;
+  /**
+   * `currency`/`iin`/`amount` filtran sobre los planes vigentes ahora mismo
+   * (ver `retrieveAll` más abajo): un plan cuyo `iin` es `null` no restringe
+   * por tarjeta, así que el filtro `iin` también lo incluye.
+   */
+  retrieveAll(
+    accountId: string,
+    filters?: RetrieveAllInstallmentPlansFilters,
+  ): Promise<YunoInstallmentPlan[]>;
   update(planId: string, input: UpdateInstallmentPlanInput): Promise<YunoInstallmentPlan>;
   /** El DELETE de Yuno no devuelve JSON; solo confirma con el status HTTP. */
   remove(planId: string): Promise<void>;
@@ -118,10 +132,18 @@ export function createYunoInstallmentPlansClient(
       return (await request(`/installments-plans/${planId}`)) as YunoInstallmentPlan;
     },
 
-    async retrieveAll(accountId) {
-      return (await request(
-        `/installments-plans?account_id=${encodeURIComponent(accountId)}`,
-      )) as YunoInstallmentPlan[];
+    async retrieveAll(accountId, filters = {}) {
+      const query = new URLSearchParams({ account_id: accountId });
+      if (filters.currency !== undefined) {
+        query.set("currency", filters.currency);
+      }
+      if (filters.iin !== undefined) {
+        query.set("iin", filters.iin);
+      }
+      if (filters.amount !== undefined) {
+        query.set("amount", filters.amount);
+      }
+      return (await request(`/installments-plans?${query.toString()}`)) as YunoInstallmentPlan[];
     },
 
     async update(planId, input) {

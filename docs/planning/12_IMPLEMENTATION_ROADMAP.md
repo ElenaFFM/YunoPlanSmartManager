@@ -33,9 +33,10 @@ Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durabl
 
 - [x] Proyecto Next.js mínimo desde cero.
 - [x] Toolchain, lint, typecheck, tests y build.
-- [x] Spike server-side contra sandbox (create/retrieve/update/delete de installment plans, ver hallazgos en `13_OPEN_DECISIONS.md` §6). Falta cubrir `retrieveAll` con filtros (`currency`, `iin`, `amount`).
+- [x] Spike server-side contra sandbox (create/retrieve/update/delete de installment plans, ver hallazgos en `13_OPEN_DECISIONS.md` §6).
 - [x] Contract test automatizado para los cinco endpoints: `src/modules/executions/infrastructure/yuno-client.ts` (cliente HTTP) + `yuno-installments.contract.ts` (`npm run test:contract:yuno`, manual, no corre en CI). Pendiente cargar `YUNO_PUBLIC_API_KEY`/`YUNO_PRIVATE_SECRET_KEY`/`YUNO_CONTRACT_TEST_ACCOUNT_ID` de sandbox en `.env` para poder ejecutarlo — sin esas credenciales el script falla con un mensaje explícito en vez de silenciarse.
-- [ ] Pruebas de prioridad, fechas, `get all` futuro y expiración.
+- [x] `retrieveAll` con filtros (`currency`, `iin`, `amount`) y comportamiento ante fechas: verificado contra la cuenta sandbox real que `retrieveAll` solo lista planes vigentes ahora (un plan vencido o futuro no aparece, aunque sigue existiendo y respondiendo a `retrieve` por ID), y que los tres filtros funcionan como documenta el OpenAPI de Yuno (`13_OPEN_DECISIONS.md` §6, "Hallazgos adicionales (2026-08-06)").
+- [ ] Pruebas de prioridad entre planes superpuestos: confirmado que requiere el Laboratorio SDK (Fase 7) vía checkout, no es alcanzable con el CRUD de planes de Fase 0 (`13_OPEN_DECISIONS.md` §6).
 - [ ] ADRs pendientes de identidad, SDK y calendario. La topología Render/Railway ya está documentada.
 - [ ] Prueba de latencia y estabilidad desde Render hacia Railway PostgreSQL.
 - [ ] Configuración y prueba de restore de backups/PITR en Railway. Esto no implica restaurar la cuenta sandbox descartable.

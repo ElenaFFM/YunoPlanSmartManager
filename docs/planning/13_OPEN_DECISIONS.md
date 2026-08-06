@@ -113,11 +113,18 @@ Los datos se suministrarán cuando sean necesarios.
 - Timestamps: `created_at`/`updated_at` en UTC con nanosegundos en la respuesta de `create`/`update` (ej. `2026-08-05T22:20:25.849295859Z`) pero truncados a microsegundos en `retrieve`/`get all` (`...849295Z`). No asumir la misma precisión en todos los endpoints.
 - `availability.start_at`/`finish_at` pueden venir como string vacío `""` (no `null`) cuando no están definidos en un plan existente (visto en planes reales de la cuenta, no en el creado por el spike).
 
+### Hallazgos adicionales (2026-08-06, extensión del contract test)
+
+- **`retrieveAll` solo devuelve planes vigentes ahora mismo, no todos los que existen.** Un plan con `finish_at` ya pasado, o con `start_at` todavía futuro, no aparece en `GET /installments-plans` — pero sigue existiendo y es recuperable por `GET /installments-plans/{id}`. Verificado creando un plan con ventana 2020 (vencido) y otro con ventana 2099 (futuro): ambos responden a `retrieve`, ninguno aparece en `retrieveAll`. Confirma que "get all" filtra por vigencia, no que borra o excluye del sistema.
+- **`retrieveAll` soporta filtros opcionales `currency`, `iin` y `amount`** (además del `account_id` obligatorio), documentados en el OpenAPI de Yuno pero no cubiertos por el spike original. Verificado contra la cuenta sandbox real:
+  - `currency`: coincidencia exacta (`ARS` incluye los planes de la cuenta, que son todos ARS; `USD` devuelve 0).
+  - `iin`: incluye un plan si su lista de `iin` contiene el valor filtrado, **o si el plan no tiene `iin` (lista `null`, sin restricción de tarjeta)** — un plan General sin `iin` calza con cualquier filtro `iin`.
+  - `amount`: incluye un plan si el valor cae dentro de `[min_value, max_value]` inclusive; probado contra los tramos reales de la cuenta (`amount=150000` devolvió exactamente los 6 planes cuyo rango lo cubre, `amount=5000000` los 6 que corresponden a los tramos superiores).
+  - Los tres filtros solo se aplican sobre el conjunto de planes vigentes (ver punto anterior), no sobre el total histórico.
+  - Cliente propio extendido en `yuno-client.ts` (`RetrieveAllInstallmentPlansFilters`), cubierto en `yuno-installments.contract.ts`.
+
 ### Pendiente de verificar (no cubierto por este spike)
 
-- `get all` devuelve solo activos y comportamiento exacto en límites — no se probó con un plan vencido (`finish_at` pasado) en `get all`.
-- retrieve por ID para futuros/finalizados — no se probó explícitamente.
-- desaparición automática tras `finish_at`.
 - **prioridad por `created_at`, BIN y monto — requiere el Laboratorio SDK (Fase 7), no un spike de Fase 0.** La prioridad real entre planes superpuestos se resuelve en el motor de Yuno durante el checkout, no en el CRUD de `installments-plans`. Para observarla hace falta crear una sesión de checkout con una tarjeta de prueba que calce en varios planes y ver cuál se ofrece — eso requiere `createCustomer`/`createCheckoutSession`/`retrievePaymentMethodsForCheckoutSession`, fuera del alcance del spike de Fase 0 realizado el 2026-08-05 (que solo cubrió el CRUD de planes). Queda pendiente para cuando se aborde Fase 7.
 - comportamiento ante rangos contiguos/superpuestos.
 - límites de cantidad de planes/requests (rate limiting).

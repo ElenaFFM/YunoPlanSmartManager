@@ -13,7 +13,7 @@ async function main() {
   const client = createYunoInstallmentPlansClient(credentials);
 
   const testKey = `contract-${Date.now()}`;
-  let createdPlanId: string | undefined;
+  const createdPlanIds = new Set<string>();
 
   try {
     const created = await client.create({
@@ -30,7 +30,7 @@ async function main() {
       availability: { start_at: "2026-08-05T00:00:00Z", finish_at: "2026-12-31T23:59:59Z" },
       iin: ["411111", "555555"],
     });
-    createdPlanId = created.id;
+    createdPlanIds.add(created.id);
 
     assert.equal(created.name, `[TEST] ${testKey}`);
     assert.equal(created.installments_plan.length, 3);
@@ -43,6 +43,39 @@ async function main() {
     assert.ok(
       all.some((plan) => plan.id === created.id),
       "el plan recién creado debe aparecer en retrieveAll",
+    );
+
+    // Filtros de retrieveAll (currency/iin/amount), verificados contra el
+    // plan recién creado: cada filtro debe incluirlo cuando calza y
+    // excluirlo cuando no.
+    const matchingByIin = await client.retrieveAll(credentials.accountId, { iin: "411111" });
+    assert.ok(matchingByIin.some((plan) => plan.id === created.id), "el filtro iin debe incluirlo si calza");
+
+    const excludedByIin = await client.retrieveAll(credentials.accountId, { iin: "999999" });
+    assert.ok(
+      !excludedByIin.some((plan) => plan.id === created.id),
+      "el filtro iin debe excluirlo si no calza con ningún iin propio ni es un plan sin restricción",
+    );
+
+    const matchingByCurrency = await client.retrieveAll(credentials.accountId, { currency: "ARS" });
+    assert.ok(matchingByCurrency.some((plan) => plan.id === created.id), "el filtro currency debe incluirlo si calza");
+
+    const excludedByCurrency = await client.retrieveAll(credentials.accountId, { currency: "USD" });
+    assert.ok(
+      !excludedByCurrency.some((plan) => plan.id === created.id),
+      "el filtro currency debe excluirlo si no calza",
+    );
+
+    const matchingByAmount = await client.retrieveAll(credentials.accountId, { amount: "50000" });
+    assert.ok(
+      matchingByAmount.some((plan) => plan.id === created.id),
+      "el filtro amount debe incluirlo si el monto cae dentro de min_value/max_value",
+    );
+
+    const excludedByAmount = await client.retrieveAll(credentials.accountId, { amount: "999999999" });
+    assert.ok(
+      !excludedByAmount.some((plan) => plan.id === created.id),
+      "el filtro amount debe excluirlo si el monto cae fuera de min_value/max_value",
     );
 
     await client.update(created.id, { name: `[TEST] ${testKey} - renombrado` });
@@ -64,7 +97,7 @@ async function main() {
     );
 
     await client.remove(created.id);
-    createdPlanId = undefined;
+    createdPlanIds.delete(created.id);
 
     await assert.rejects(
       () => client.retrieve(created.id),
@@ -75,6 +108,52 @@ async function main() {
       },
     );
 
+    // Fechas, "get all" futuro y expiración (13_OPEN_DECISIONS.md §6, antes
+    // "pendiente de verificar"): un plan fuera de su ventana de vigencia sigue
+    // existiendo y es recuperable por ID, pero retrieveAll solo devuelve los
+    // planes vigentes ahora mismo.
+    const expiredPlan = await client.create({
+      name: `[TEST] ${testKey}-expired`,
+      account_id: [credentials.accountId],
+      merchant_reference: `${testKey}-expired`,
+      installments_plan: [{ installment: 1, rate: 1 }],
+      country_code: "AR",
+      amount: { currency: "ARS", min_value: 0, max_value: 50_000 },
+      availability: { start_at: "2020-01-01T00:00:00Z", finish_at: "2020-01-02T00:00:00Z" },
+      iin: ["411111"],
+    });
+    createdPlanIds.add(expiredPlan.id);
+
+    const futurePlan = await client.create({
+      name: `[TEST] ${testKey}-future`,
+      account_id: [credentials.accountId],
+      merchant_reference: `${testKey}-future`,
+      installments_plan: [{ installment: 1, rate: 1 }],
+      country_code: "AR",
+      amount: { currency: "ARS", min_value: 0, max_value: 50_000 },
+      availability: { start_at: "2099-01-01T00:00:00Z", finish_at: "2099-06-01T00:00:00Z" },
+      iin: ["411111"],
+    });
+    createdPlanIds.add(futurePlan.id);
+
+    assert.equal((await client.retrieve(expiredPlan.id)).id, expiredPlan.id, "un plan vencido sigue siendo retrievable por ID");
+    assert.equal((await client.retrieve(futurePlan.id)).id, futurePlan.id, "un plan futuro sigue siendo retrievable por ID");
+
+    const allAfterEdgeCases = await client.retrieveAll(credentials.accountId);
+    assert.ok(
+      !allAfterEdgeCases.some((plan) => plan.id === expiredPlan.id),
+      "retrieveAll no debe listar un plan cuya vigencia ya terminó",
+    );
+    assert.ok(
+      !allAfterEdgeCases.some((plan) => plan.id === futurePlan.id),
+      "retrieveAll no debe listar un plan que todavía no empezó",
+    );
+
+    await client.remove(expiredPlan.id);
+    createdPlanIds.delete(expiredPlan.id);
+    await client.remove(futurePlan.id);
+    createdPlanIds.delete(futurePlan.id);
+
     console.info(
       JSON.stringify({
         test: "yuno-installments-contract",
@@ -83,8 +162,8 @@ async function main() {
       }),
     );
   } finally {
-    if (createdPlanId) {
-      await client.remove(createdPlanId).catch(() => undefined);
+    for (const planId of createdPlanIds) {
+      await client.remove(planId).catch(() => undefined);
     }
   }
 }
