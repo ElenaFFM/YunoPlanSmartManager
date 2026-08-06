@@ -20,6 +20,7 @@
     "test:integration:queue": "node --env-file=.env --import tsx src/modules/executions/infrastructure/execution-run-queue.integration.ts",
     "test:integration:execution-worker": "node --env-file=.env --import tsx src/modules/executions/application/execution-worker.integration.ts",
     "test:integration:campaign": "node --env-file=.env --import tsx src/modules/planning/infrastructure/campaign.integration.ts",
+    "test:integration:campaign-deployment-plan": "node --env-file=.env --import tsx src/modules/executions/application/campaign-deployment-plan.integration.ts",
     "test:integration:scope-catalog": "node --env-file=.env --import tsx src/modules/planning/infrastructure/scope-catalog.integration.ts",
     "test:contract:yuno": "node --env-file=.env --import tsx src/modules/executions/infrastructure/yuno-installments.contract.ts",
     "test:contract:execution-worker": "node --env-file=.env --import tsx src/modules/executions/application/execution-worker.contract.ts",

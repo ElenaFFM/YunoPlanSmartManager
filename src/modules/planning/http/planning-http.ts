@@ -17,6 +17,7 @@ import { RemotePlanImportError } from "@/modules/executions/application/remote-p
 import { RemotePlanReconciliationError } from "@/modules/executions/application/remote-plan-reconciliation";
 import { ExecutionPlanQueueError } from "@/modules/executions/application/execution-plan-service";
 import { SandboxVerificationPlanError } from "@/modules/executions/application/sandbox-verification-plan";
+import { CampaignDeploymentPlanError } from "@/modules/executions/application/campaign-deployment-plan";
 import { ExecutionRunNotFoundError } from "@/modules/executions/application/execution-run-query";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 
@@ -139,7 +140,11 @@ export function planningErrorResponse(error: unknown) {
     );
   }
 
-  if (error instanceof ExecutionPlanQueueError || error instanceof SandboxVerificationPlanError) {
+  if (
+    error instanceof ExecutionPlanQueueError ||
+    error instanceof SandboxVerificationPlanError ||
+    error instanceof CampaignDeploymentPlanError
+  ) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },

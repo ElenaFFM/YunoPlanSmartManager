@@ -58,7 +58,7 @@ export type BuildScopeCatalogOptions = {
   campaignVersionStatuses?: readonly CampaignVersionStatus[];
 };
 
-type LoadedTemplate = {
+export type LoadedTemplate = {
   templateId: string;
   scope: TemplateScope;
   bankId: string | null;
@@ -70,7 +70,7 @@ type LoadedCampaign = {
   configuration: CampaignConfiguration;
 };
 
-async function loadActiveTemplates(): Promise<readonly LoadedTemplate[]> {
+export async function loadActiveTemplates(): Promise<readonly LoadedTemplate[]> {
   const templates = await prisma.promotionTemplate.findMany({
     where: { status: "ACTIVE", currentVersionId: { not: null } },
     include: { currentVersion: true },
@@ -143,7 +143,7 @@ function takeSingleTemplate(
 }
 
 /** Resuelve la plantilla activa correspondiente a un alcance puntual. */
-function resolveTemplateForTarget(
+export function resolveTemplateForTarget(
   templates: readonly LoadedTemplate[],
   target: CampaignTarget,
 ): LoadedTemplate | undefined {

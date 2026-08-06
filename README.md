@@ -80,12 +80,19 @@ npm.cmd run test:integration:catalog
 npm.cmd run test:integration:campaign
 npm.cmd run test:integration:scope-catalog
 npm.cmd run test:integration:execution-worker
+npm.cmd run test:integration:campaign-deployment-plan
 ```
 
 `test:integration:scope-catalog` construye el catálogo de alcances completo, que es global por
 naturaleza (una sola configuración General y una sola Amex activas). Para trabajar sobre un catálogo
 controlado desactiva temporalmente las plantillas `GENERAL`/`AMEX` preexistentes y **las restaura
 siempre** al finalizar.
+
+`test:integration:campaign-deployment-plan` prueba el planificador comercial (`enqueueCampaignSandboxDeployment`,
+que decide qué `CREATE`/`UPDATE` encolar para una campaña, sin ejecutarlos). Su precondición
+(`readyForPlanning`) es global a propósito, así que este test clasifica temporalmente los planes
+sandbox reales importados preexistentes con una clave inerte y **los restaura siempre** al finalizar
+— mismo patrón que `test:integration:scope-catalog` usa con las plantillas.
 
 `test:integration:execution-worker` ejercita `executeClaimedSandboxRun` (create/update/delete/verify y
 el motor de compensación) contra la PostgreSQL de pruebas, pero con un cliente Yuno **falso**
