@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 con el motor de dominio, campañas versionadas en base y lectura de la configuración efectiva desde el catálogo real; auditoría de requerimientos con tres correcciones aplicadas)
+**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real y generación de casos SDK; auditoría de requerimientos con tres correcciones aplicadas)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -16,7 +16,7 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 | Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
 | Auditoría | Todas las mutaciones del catálogo y de campañas generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de ejecuciones pendiente de que existan. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
-| Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico e invalidación por versión. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). Falta la API/UI de campañas. |
+| Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico, invalidación por versión y generación de casos SDK. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). Falta la API/UI de campañas. |
 | Yuno | Contract test manual verificado contra sandbox (`npm run test:contract:yuno`) usando el cliente HTTP propio. El worker todavía no ejecuta escrituras dentro de una campaña. |
 
 Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durable (`83de4c5`) y catálogo (`248749f`, `a2f010f`, `ea52811`).
@@ -107,7 +107,10 @@ Puede representarse la configuración comercial sin llamar a Yuno.
   - `template-snapshot.ts` valida con zod el `configurationSnapshot` de plantillas al leerlo, igual que `campaign-snapshot.ts` para campañas.
 - [x] Detección de superposición **entre campañas distintas** sobre el mismo alcance/tramo: `assertNoCrossCampaignOverlap` (`scope-catalog-builder.ts`) la rechaza con `CMP-005`/`CMP-006` al construir el catálogo. `validateCampaignConfiguration` solo puede validar dentro de una misma campaña (es dominio puro, ve una campaña a la vez); esta pieza corrige un hallazgo de auditoría más serio de lo que sonaba: sin ella, dos campañas superpuestas no solo quedaban "sin validar" — `projectInstallmentTimeline` aplica las reglas activas en el orden en que se le pasan, y para transformaciones que no conmutan (`CAP_MAX_INSTALLMENT` + `ADD_EXACT_INSTALLMENTS` vigentes a la vez) ese orden cambiaba el resultado de cuotas de forma silenciosa, según qué campaña se hubiera cargado primero. Ahora se rechaza explícitamente en vez de dejar que el orden de carga decida.
 - [x] Diff before/during/after a nivel de un scope/tramo: `diffInstallmentSets` y `diffTimelineSegments` (`src/modules/planning/domain/installment-diff.ts`), verificado sobre los escenarios reales de UC-01 (baja de 24 a 18) y UC-03 (agregar 18 con retorno exacto al baseline). Pendiente: un diff agregado que combine varios scopes/tramos de una campaña completa a la vez — esta pieza opera sobre una sola línea de tiempo por vez, igual que `projectInstallmentTimeline`.
-- [ ] Generación de casos SDK (monto interior/mínimo/máximo/adyacente por tramo).
+- [x] Generación de casos SDK (monto interior/mínimo/máximo/adyacente por tramo): `generateSdkTestCases` (`src/modules/planning/domain/sdk-case-generation.ts`) recorre un `ScopeCatalog` completo y, por cada tramo de cada scope (Amex/banco/General), genera un caso por cada segmento temporal distinto (reusa `projectInstallmentTimeline`, no reimplementa cortes) con el monto mínimo, máximo, interior y ambos adyacentes, más las cuotas esperadas de ese segmento.
+  - Deduplica por monto en vez de manejar bordes a mano: un tramo de un centavo (`min === max`) o sin lugar para un adyacente (`min` en cero) colapsa solo a menos casos, sin ramas especiales.
+  - Requirió `formatAmountFromCents` (`amount.ts`), inversa de `parseAmountToCents`, para reconstruir montos desde centavos calculados.
+  - **Deliberadamente afuera de este alcance:** tarjetas/BIN de prueba concretas y las etapas antes/durante/después atadas a una campaña puntual (`SDK-002` a `SDK-004`) — eso depende de `TestRun` y el resto del laboratorio SDK, que es Fase 7. Esta pieza es la matriz de casos en dominio puro, sin esa infraestructura.
 - [ ] Property-based tests con librería dedicada (por ahora los invariantes de contigüidad se prueban con casos concretos, sin agregar dependencias nuevas).
 - [x] Hash canónico reutilizable (`computeCanonicalHash`, `src/modules/planning/domain/canonical-hash.ts`) para `CampaignVersion.canonicalHash`.
 
@@ -117,7 +120,7 @@ Puede representarse la configuración comercial sin llamar a Yuno.
 
 Una auditoría posterior contra la documentación de requerimientos encontró tres gaps no declarados, ya corregidos y verificados con datos reales: `rangeIndex` sin validar contra el catálogo real, `InvalidScopeCatalogError` sin código estable, y superposición entre campañas distintas resuelta por orden de carga en vez de rechazada explícitamente (ver los tres puntos arriba).
 
-Falta para cerrar la fase: API HTTP y UI de campañas, y generación de casos SDK (fuera de alcance por ahora).
+Falta para cerrar la fase: API HTTP y UI de campañas.
 
 ## Fase 4: UX de planificación
 

@@ -15,6 +15,16 @@ export function parseAmountToCents(value: string): bigint {
   return BigInt(match[1]) * 100n + BigInt(decimal || "0");
 }
 
+/** Inversa de `parseAmountToCents`, para reconstruir el formato compartido a partir de un cálculo en centavos. */
+export function formatAmountFromCents(cents: bigint): string {
+  if (cents < 0n) {
+    throw new InvalidAmountError(`No se puede representar un monto negativo (${cents} centavos).`);
+  }
+  const wholePart = cents / 100n;
+  const centsPart = (cents % 100n).toString().padStart(2, "0");
+  return `${wholePart}.${centsPart}`;
+}
+
 export type CentsRange = { minCents: bigint; maxCents: bigint };
 
 export function rangesOverlap(a: CentsRange, b: CentsRange): boolean {
