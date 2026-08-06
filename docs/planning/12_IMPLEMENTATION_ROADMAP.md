@@ -145,10 +145,10 @@ Un usuario puede crear y validar un borrador complejo sin escribir JSON.
 - [x] Adapter de lectura reutilizable y endpoint `GET/POST /api/planning/remote-plans`: lectura del registro local e importación manual de planes visibles de sandbox, restringida a `ADMIN`.
 - [x] Importación idempotente de planes vigentes visibles: conserva snapshot y timestamps, crea/actualiza por `environment + yunoPlanId` y audita el lote. La ausencia de un plan en `retrieveAll` no borra ni altera registros locales porque Yuno oculta futuros y vencidos.
 - [x] Primera carga manual de sandbox por un `ADMIN`: el 2026-08-06 se importaron los 20 planes visibles de la cuenta de pruebas (20 creados, 0 actualizados). No se realizaron escrituras en Yuno.
-- [ ] Carga asistida de futuros conocidos por ID (Yuno no los devuelve en `retrieveAll`).
-- [ ] Clasificación y reconciliación inicial.
+- [x] Carga asistida por IDs conocidos en `POST /api/planning/remote-plans/known`: admite hasta 50 IDs, los lee secuencialmente desde Yuno sandbox, es idempotente y audita el lote. Permite registrar planes futuros o vencidos que `retrieveAll` no devuelve; sigue pendiente ingresar los IDs comerciales concretos cuando existan.
+- [x] Clasificación y reconciliación inicial: `GET /api/planning/remote-plans/reconciliation` expone el inventario local y su cola de revisión; `PATCH /api/planning/remote-plans/:id` permite que un `ADMIN` clasifique como `CLASSIFIED` o `ANOMALY`, agregue asociaciones opcionales y deje auditoría. No infiere coincidencias comerciales ni cambia Yuno: las asociaciones quedan pendientes de confirmación humana.
 - [ ] `RemotePlan` de producción con credenciales y gates separados.
-- [ ] Asociaciones opcionales mientras un plan importado se clasifica.
+- [x] Asociaciones opcionales mientras un plan importado se clasifica (`rangeIndex`, `segmentKey`, `equivalentLogicalKey`), siempre confirmadas manualmente y auditadas.
 
 ### Salida
 

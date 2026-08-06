@@ -14,6 +14,7 @@ import {
   InvalidRemotePlanSnapshotError,
 } from "@/modules/executions/application/remote-plan-snapshot";
 import { RemotePlanImportError } from "@/modules/executions/application/remote-plan-import";
+import { RemotePlanReconciliationError } from "@/modules/executions/application/remote-plan-reconciliation";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 
 export const effectiveConfigurationQuerySchema = z.object({
@@ -38,6 +39,18 @@ export const campaignConfigurationSchema = z.object({
   description: z.string().max(1000).optional(),
   changeReason: z.string().min(1).max(500),
   segments: z.array(campaignSegmentSchema).min(1),
+});
+
+export const importKnownRemotePlansSchema = z.object({
+  planIds: z.array(z.string()).min(1).max(50),
+});
+
+export const updateRemotePlanClassificationSchema = z.object({
+  importStatus: z.enum(["CLASSIFIED", "ANOMALY"]),
+  rangeIndex: z.number().int().positive().nullable().optional(),
+  segmentKey: z.string().trim().min(1).max(200).nullable().optional(),
+  equivalentLogicalKey: z.string().trim().min(1).max(200).nullable().optional(),
+  note: z.string().trim().min(1).max(1_000).optional(),
 });
 
 export function planningErrorResponse(error: unknown) {
@@ -106,6 +119,13 @@ export function planningErrorResponse(error: unknown) {
   }
 
   if (error instanceof RemotePlanImportError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: error.status },
+    );
+  }
+
+  if (error instanceof RemotePlanReconciliationError) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },
