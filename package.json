@@ -18,6 +18,7 @@
     "test:watch": "node --experimental-strip-types --experimental-test-isolation=none --test --watch src/modules/catalog/domain/iin.test.ts src/modules/catalog/domain/template-configuration.test.ts src/modules/planning/domain/installments.test.ts src/modules/executions/domain/lease-policy.test.ts src/infrastructure/config/env.test.ts",
     "test:integration:catalog": "node --env-file=.env --import tsx src/modules/catalog/infrastructure/catalog.integration.ts",
     "test:integration:queue": "node --env-file=.env --import tsx src/modules/executions/infrastructure/execution-run-queue.integration.ts",
+    "test:contract:yuno": "node --env-file=.env --import tsx src/modules/executions/infrastructure/yuno-installments.contract.ts",
     "prisma:generate": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js generate",
     "db:seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts",
     "db:migrate:dev": "node --env-file-if-exists=.env ./node_modules/prisma/build/index.js migrate dev",

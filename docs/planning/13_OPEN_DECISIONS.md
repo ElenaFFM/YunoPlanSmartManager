@@ -102,16 +102,26 @@ Los datos se suministrarán cuando sean necesarios.
 
 ## 6. Contrato Yuno a verificar
 
-- `get all` devuelve solo activos y comportamiento exacto en límites.
-- retrieve por ID para futuros/finalizados.
-- respuesta real de delete.
-- campos y efectos de PATCH.
+### Hallazgos del spike (2026-08-05, contra `api-sandbox.y.uno`, cuenta `f23331d0-…`)
+
+- **`GET /installments-plans` exige `account_id`.** La aplicación siempre lo va a enviar explícito (nunca vacío), por lo que el comportamiento sin `account_id` queda fuera de alcance. Con `account_id` explícito devolvió únicamente los planes de esa cuenta (20 planes), sin mezclar otras cuentas.
+- **`GET` no muestra metadata de paginación** (sin `cursor`/`next`/`total`) en la respuesta con `account_id` explícito; es un array plano.
+- **PATCH tiene un problema de consistencia de lectura inmediata:** al actualizar solo el campo `name`, la respuesta del PATCH mostró `country_code` vacío y `updated_at` sin cambios (igual a `created_at`), pero un `GET` inmediatamente después mostró `country_code` correcto (preservado) y `updated_at` actualizado. **Conclusión: la respuesta del PATCH no es confiable como fuente de verdad; siempre hay que verificar con un `GET` posterior.** Esto confirma que el paso de "verificación posterior" ya previsto en `07_YUNO_EXECUTION.md` es obligatorio, no defensivo de más.
+- **PATCH parcial funciona:** enviar solo `name` no borró el resto de los campos (`installments_plan`, `amount`, `iin`, `availability` se preservaron), pese a que la respuesta inmediata sugería lo contrario (ver punto anterior).
+- **DELETE no devuelve JSON.** La respuesta vino vacía/no-JSON (el cliente MCP falló con "Unexpected end of JSON input"), consistente con el ejemplo de la documentación oficial que muestra literalmente `"HTTP 201 Created"` como valor, no un objeto. Confirmar en el adapter propio que no se debe intentar parsear body de DELETE como JSON.
+- **DELETE es efectivo e inmediato:** un `retrieve` por ID después del delete devuelve `400` con `CODE=404` y mensaje `"Not found"` (no un 404 HTTP puro, viene envuelto en `REJECTED.INVALID_REQUEST` con status 400 en el body).
+- Timestamps: `created_at`/`updated_at` en UTC con nanosegundos en la respuesta de `create`/`update` (ej. `2026-08-05T22:20:25.849295859Z`) pero truncados a microsegundos en `retrieve`/`get all` (`...849295Z`). No asumir la misma precisión en todos los endpoints.
+- `availability.start_at`/`finish_at` pueden venir como string vacío `""` (no `null`) cuando no están definidos en un plan existente (visto en planes reales de la cuenta, no en el creado por el spike).
+
+### Pendiente de verificar (no cubierto por este spike)
+
+- `get all` devuelve solo activos y comportamiento exacto en límites — no se probó con un plan vencido (`finish_at` pasado) en `get all`.
+- retrieve por ID para futuros/finalizados — no se probó explícitamente.
 - desaparición automática tras `finish_at`.
-- prioridad por `created_at`, BIN y monto.
-- zona horaria y precisión en segundos/milisegundos.
-- comportamiento ante rangos contiguos.
-- límites de cantidad de planes/requests.
-- disponibilidad de idempotencia para installment plans.
+- **prioridad por `created_at`, BIN y monto — requiere el Laboratorio SDK (Fase 7), no un spike de Fase 0.** La prioridad real entre planes superpuestos se resuelve en el motor de Yuno durante el checkout, no en el CRUD de `installments-plans`. Para observarla hace falta crear una sesión de checkout con una tarjeta de prueba que calce en varios planes y ver cuál se ofrece — eso requiere `createCustomer`/`createCheckoutSession`/`retrievePaymentMethodsForCheckoutSession`, fuera del alcance del spike de Fase 0 realizado el 2026-08-05 (que solo cubrió el CRUD de planes). Queda pendiente para cuando se aborde Fase 7.
+- comportamiento ante rangos contiguos/superpuestos.
+- límites de cantidad de planes/requests (rate limiting).
+- disponibilidad de idempotencia para installment plans (no hay campo de idempotency key en el schema de `create`; no se probó crear el mismo plan dos veces).
 
 ## 7. Registro de decisiones
 
