@@ -20,6 +20,7 @@ import { SandboxVerificationPlanError } from "@/modules/executions/application/s
 import { CampaignDeploymentPlanError } from "@/modules/executions/application/campaign-deployment-plan";
 import { ExecutionRunNotFoundError } from "@/modules/executions/application/execution-run-query";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
+import { GandalfCheckoutApiError } from "@/modules/sdk-lab/infrastructure/gandalf-checkout-client";
 
 export const effectiveConfigurationQuerySchema = z.object({
   bin: z.string().regex(/^\d{6,8}$/, "El BIN debe tener entre 6 y 8 dígitos."),
@@ -158,6 +159,13 @@ export function planningErrorResponse(error: unknown) {
   if (error instanceof InvalidRemotePlanSnapshotError || error instanceof YunoApiError) {
     return NextResponse.json(
       { error: { code: "REMOTE_READ_FAILED", message: "No se pudo interpretar la respuesta de Yuno." } },
+      { status: 502 },
+    );
+  }
+
+  if (error instanceof GandalfCheckoutApiError) {
+    return NextResponse.json(
+      { error: { code: "SDK_CHECKOUT_SESSION_FAILED", message: error.message } },
       { status: 502 },
     );
   }

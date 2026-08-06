@@ -11,6 +11,7 @@ export default function PlanningLayout({ children }: { children: React.ReactNode
         <nav className="tabs">
           <Link href="/planning/campanas">Campañas</Link>
           <Link href="/planning/remotos">Planes remotos</Link>
+          <Link href="/planning/laboratorio-sdk">Laboratorio SDK</Link>
           <Link href="/catalog/bancos">→ Catálogo</Link>
         </nav>
         <IdentityBadge />

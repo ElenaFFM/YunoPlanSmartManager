@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getYunoContractTestCredentials, parseServerEnvironment } from "./env.ts";
+import {
+  getGandalfCheckoutSessionConfig,
+  getYunoSdkPublicApiKey,
+  getYunoContractTestCredentials,
+  parseServerEnvironment,
+} from "./env.ts";
 
 describe("server environment", () => {
   it("accepts a local process connected to sandbox", () => {
@@ -39,5 +44,24 @@ describe("server environment", () => {
       }),
       /YUNO_ENV=production/,
     );
+  });
+
+  it("requires the Gandalf checkout URL when the SDK lab creates a session", () => {
+    const environment = parseServerEnvironment({
+      APP_ENV: "development",
+      DATABASE_URL: "postgresql://test.invalid/database",
+    });
+
+    assert.throws(() => getGandalfCheckoutSessionConfig(environment), /GANDALF_CHECKOUT_SESSION_URL/);
+  });
+
+  it("returns the Yuno public key for the browser SDK only when configured", () => {
+    const environment = parseServerEnvironment({
+      APP_ENV: "development",
+      DATABASE_URL: "postgresql://test.invalid/database",
+      YUNO_PUBLIC_API_KEY: "public-key",
+    });
+
+    assert.equal(getYunoSdkPublicApiKey(environment), "public-key");
   });
 });

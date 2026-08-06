@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Identity = {
   id: string;
   displayName: string;
+  email: string;
   role: "VIEWER" | "OPERATOR" | "ADMIN";
 };
 

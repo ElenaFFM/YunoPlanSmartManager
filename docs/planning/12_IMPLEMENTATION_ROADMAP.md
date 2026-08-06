@@ -181,6 +181,12 @@ Una campaña se aplica y revierte con seguridad en sandbox, incluyendo el cálcu
 
 ## Fase 7: Laboratorio SDK
 
+- [x] Lite SDK recibe la `checkout_session` del BFF, ejecuta `startCheckout` y monta `CARD` para el laboratorio, sin `startPayment` ni creacion de pagos.
+
+- [x] UI inicial de laboratorio: permite crear y validar una `checkout_session` sandbox desde datos de prueba y muestra su identificador, sin iniciar checkout ni pagos.
+- [x] Lite SDK cargado e inicializado en sandbox mediante `@yuno-payments/sdk-web` en `/planning/laboratorio-sdk`; usa SRI, requiere `OPERATOR`/`ADMIN` y no inicia checkout ni pagos.
+- [x] BFF de sesion de checkout sandbox: `POST /api/planning/sdk/checkout-sessions` crea la sesion usando `GANDALF_CHECKOUT_SESSION_URL`, solo para `OPERATOR`/`ADMIN` y con `YUNO_ENV=sandbox`. La respuesta queda sin cache y se audita sin PII. Falta recibir el contrato de respuesta/inicializacion del SDK para embeberlo y observar cuotas.
+
 - integración SDK sin pagos.
 - checkpoints lógicos.
 - fechas ficticias aisladas.

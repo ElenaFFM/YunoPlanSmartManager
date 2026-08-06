@@ -27,6 +27,6 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    data: { id: user.id, displayName: user.displayName, role: user.role },
+    data: { id: user.id, displayName: user.displayName, email: user.email, role: user.role },
   });
 }

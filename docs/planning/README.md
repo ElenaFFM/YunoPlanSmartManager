@@ -2,7 +2,7 @@
 
 - **Estado:** planificación consolidada y desarrollo en curso
 - **Fecha base:** 5 de agosto de 2026
-- **Última actualización de implementación:** 5 de agosto de 2026
+- **Última actualización de implementación:** 6 de agosto de 2026
 - **Alcance:** nueva aplicación para administrar planes de cuotas de Yuno en Argentina
 
 ## Objetivo del paquete
@@ -11,7 +11,7 @@ Este directorio organiza las decisiones, reglas, flujos, riesgos y etapas de imp
 
 La documentación debe mantenerse actualizada junto con el código. Una decisión que cambie el comportamiento del producto deberá modificar primero o en el mismo cambio el documento correspondiente.
 
-El avance ejecutado se mantiene en el [roadmap de implementación](12_IMPLEMENTATION_ROADMAP.md). Están completas las fundaciones, el claim/lease del worker, el catálogo versionado con auditoría y el motor de campañas con API y UI básica. La Fase 4 ya incorporó calendario accesible, impacto lógico, historial de versiones y asistente guiado de campañas; continúa pendiente el dashboard operativo. La Fase 5 comenzó con `RemotePlan`, una migración aplicada en pruebas y una primera importación sandbox de solo lectura (20 planes visibles); siguen la carga de futuros, la clasificación y la reconciliación. Las decisiones que guían las fases siguientes se registran en [decisiones abiertas y cerradas](13_OPEN_DECISIONS.md).
+El avance ejecutado se mantiene en el [roadmap de implementación](12_IMPLEMENTATION_ROADMAP.md), que es la fuente única de estado. Están completas las fundaciones, el claim/lease del worker, el catálogo versionado con auditoría, el motor de campañas con API/UI y la transición `DRAFT`→`VALIDATED`. La Fase 4 ya incorporó calendario accesible, impacto lógico, historial de versiones y asistente guiado; continúa pendiente el dashboard operativo. La Fase 5 completó el registro, la importación, la clasificación y la reconciliación inicial de `RemotePlan` en sandbox. La Fase 6 cerró su MVP: el planificador comercial deriva un plan de ejecución desde una campaña y el worker lo ejecuta contra sandbox con verificación, compensación y recuperación. El siguiente bloque funcional es el Laboratorio SDK (Fase 7). Las decisiones que guían las fases siguientes se registran en [decisiones abiertas y cerradas](13_OPEN_DECISIONS.md).
 
 ## Documentos
 

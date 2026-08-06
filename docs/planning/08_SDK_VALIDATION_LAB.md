@@ -118,6 +118,11 @@ La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado c
 
 ## 10. Experiencia SDK
 
+- El laboratorio inicia Lite SDK con la `checkout_session` sandbox y monta el flujo `CARD` embebido (`renderMode: element`), no modal y sin overlay de carga, con el boton de pago oculto. Tras montarlo llama a `startPayment` unicamente para abrir el formulario Lite de tarjeta y consultar BIN/cuotas; `showPayButton` sigue deshabilitado y no se implementa la creacion de pagos.
+- Lite SDK exige un callback `createPayment` para inicializarse; el laboratorio provee uno que bloquea el intento localmente y no llama a ningun servicio de pagos.
+
+- Lite SDK se carga con el paquete oficial `@yuno-payments/sdk-web`, en modo `sandbox` y con SRI. Su clave publica se entrega solo desde un endpoint autenticado de la aplicacion; el primer cargador no inicia checkout ni pagos.
+
 - SDK embebido o integrado en página aislada.
 - Selector de tarjeta de prueba y monto precargado por caso.
 - Cuotas observadas capturadas automáticamente si el SDK lo permite; si no, selección manual confirmada.
@@ -126,6 +131,8 @@ La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado c
 - Datos de prueba claramente identificados.
 
 ## 11. Criterios de aceptación
+
+La sesion de checkout se crea server-side mediante `GANDALF_CHECKOUT_SESSION_URL`. La URL no se expone al navegador; la respuesta se devuelve solo al usuario autorizado, sin cache, para que el inicializador del SDK pueda consumirla.
 
 - Es imposible generar un test contra producción desde UI o API.
 - Una fecha ficticia nunca modifica `CampaignVersion`.
