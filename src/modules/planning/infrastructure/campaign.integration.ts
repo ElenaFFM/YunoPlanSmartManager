@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { prisma } from "@/infrastructure/database/prisma";
+import { createBank, createTemplate } from "@/modules/catalog/application/catalog-service";
 import {
   CampaignInputError,
   createCampaign,
@@ -10,9 +11,13 @@ import { parseCampaignSegments } from "../application/campaign-snapshot";
 import type { CampaignSegment } from "../domain/campaign";
 
 const testId = `campaign-${Date.now()}`;
+const stamp = String(Date.now()).slice(-6);
 let userId: string | undefined;
 let campaignId: string | undefined;
 let deploymentId: string | undefined;
+let realBankId: string | undefined;
+let realBankTemplateId: string | undefined;
+let outOfBoundsCampaignId: string | undefined;
 
 const baseSegments: readonly CampaignSegment[] = [
   {
@@ -194,6 +199,74 @@ try {
   const finalState = await getCampaign(campaignId);
   assert.equal(finalState.versions.length, 2, "las escrituras rechazadas no deben dejar versiones");
 
+  // 8. Un tramo que no existe en el catálogo real se rechaza al crear la
+  // campaña, en vez de ignorarse en silencio al proyectarse (CMP-007).
+  const realBank = await createBank(
+    { code: `B${stamp}`, name: `Banco real ${testId}`, iins: [`4${stamp}9`] },
+    user.id,
+  );
+  realBankId = realBank.id;
+
+  const realBankTemplate = await createTemplate({
+    name: `Plantilla banco real ${testId}`,
+    scope: "BANK",
+    bankId: realBankId,
+    ranges: [
+      { minAmount: "0", maxAmount: "199999.99", installments: [6, 1] },
+      { minAmount: "200000", maxAmount: "999999.99", installments: [12, 1] },
+      { minAmount: "1000000", maxAmount: "2299999.99", installments: [18, 1] },
+      { minAmount: "2300000", maxAmount: "99999999", installments: [24, 1] },
+    ],
+    changeReason: "Catálogo del test de rangeIndex",
+    createdById: user.id,
+  });
+  realBankTemplateId = realBankTemplate.id;
+
+  await assert.rejects(
+    createCampaign({
+      name: `Tramo inexistente ${testId}`,
+      changeReason: "Debe rechazarse por CMP-007",
+      segments: [
+        {
+          id: "seg-out-of-bounds",
+          target: { type: "BANK", bankId: realBankId },
+          startAt: new Date("2026-09-01T00:00:00-03:00"),
+          endAt: null,
+          indefiniteConfirmed: true,
+          rangeChanges: [
+            { rangeIndex: 5, transformation: { type: "CAP_MAX_INSTALLMENT", maximum: 12 } },
+          ],
+        },
+      ],
+      createdById: user.id,
+    }),
+    (error) =>
+      error instanceof CampaignInputError &&
+      error.code === "CMP-007" &&
+      /no tiene un tramo 5/.test(error.message),
+  );
+
+  // El mismo banco, referenciando un tramo real, sí se acepta.
+  const validRangeCampaign = await createCampaign({
+    name: `Tramo válido ${testId}`,
+    changeReason: "Debe aceptarse",
+    segments: [
+      {
+        id: "seg-in-bounds",
+        target: { type: "BANK", bankId: realBankId },
+        startAt: new Date("2026-09-01T00:00:00-03:00"),
+        endAt: null,
+        indefiniteConfirmed: true,
+        rangeChanges: [
+          { rangeIndex: 4, transformation: { type: "CAP_MAX_INSTALLMENT", maximum: 12 } },
+        ],
+      },
+    ],
+    createdById: user.id,
+  });
+  outOfBoundsCampaignId = validRangeCampaign.campaign.id;
+  assert.deepEqual(validRangeCampaign.findings, []);
+
   const auditEvents = await prisma.auditEvent.findMany({ where: { actorId: user.id } });
   assert.ok(auditEvents.some((event) => event.action === "campaign.create"));
   assert.ok(auditEvents.some((event) => event.action === "campaign.update.cosmetic"));
@@ -212,10 +285,23 @@ try {
     await prisma.executionRun.deleteMany({ where: { deploymentId } });
     await prisma.deployment.deleteMany({ where: { id: deploymentId } });
   }
-  if (campaignId) {
-    await prisma.campaign.updateMany({ where: { id: campaignId }, data: { currentVersionId: null } });
-    await prisma.campaignVersion.deleteMany({ where: { campaignId } });
-    await prisma.campaign.deleteMany({ where: { id: campaignId } });
+  for (const id of [campaignId, outOfBoundsCampaignId]) {
+    if (!id) continue;
+    await prisma.campaign.updateMany({ where: { id }, data: { currentVersionId: null } });
+    await prisma.campaignVersion.deleteMany({ where: { campaignId: id } });
+    await prisma.campaign.deleteMany({ where: { id } });
+  }
+  if (realBankTemplateId) {
+    await prisma.promotionTemplate.updateMany({
+      where: { id: realBankTemplateId },
+      data: { currentVersionId: null },
+    });
+    await prisma.templateVersion.deleteMany({ where: { templateId: realBankTemplateId } });
+    await prisma.promotionTemplate.deleteMany({ where: { id: realBankTemplateId } });
+  }
+  if (realBankId) {
+    await prisma.bankIin.deleteMany({ where: { bankId: realBankId } });
+    await prisma.bank.deleteMany({ where: { id: realBankId } });
   }
   if (userId) {
     await prisma.user.deleteMany({ where: { id: userId } });

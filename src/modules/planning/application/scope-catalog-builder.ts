@@ -2,6 +2,7 @@ import { CampaignVersionStatus, type TemplateScope } from "@/generated/prisma/cl
 import { prisma } from "@/infrastructure/database/prisma";
 import {
   buildTemporalRules,
+  campaignTargetKey,
   type CampaignConfiguration,
   type CampaignTarget,
 } from "../domain/campaign";
@@ -119,6 +120,55 @@ function takeSingleTemplate(
   }
 
   return matching[0];
+}
+
+/** Resuelve la plantilla activa correspondiente a un alcance puntual. */
+function resolveTemplateForTarget(
+  templates: readonly LoadedTemplate[],
+  target: CampaignTarget,
+): LoadedTemplate | undefined {
+  if (target.type === "BANK") {
+    const matching = templates.filter(
+      (template) => template.scope === "BANK" && template.bankId === target.bankId,
+    );
+    if (matching.length > 1) {
+      throw new InconsistentScopeCatalogError(
+        `El banco ${target.bankId} tiene más de una plantilla bancaria activa.`,
+      );
+    }
+    return matching[0];
+  }
+
+  return takeSingleTemplate(templates, target.type);
+}
+
+/**
+ * Índices de tramo que realmente existen para cada alcance pedido, según la
+ * plantilla activa. Se usa para validar `CampaignRangeChange.rangeIndex`
+ * (CMP-007) contra el catálogo real antes de guardar una campaña — sin esto,
+ * una campaña podía referenciar un tramo inexistente (p. ej. el 4 sobre Amex,
+ * que hoy solo tiene 2) y la regla se ignoraba en silencio en la proyección.
+ * Un alcance sin plantilla activa no aparece en el mapa: no hay forma de
+ * saber qué es válido, así que el chequeo se omite para ese alcance (mismo
+ * comportamiento que antes de esta validación).
+ */
+export async function loadRangeIndexesByTarget(
+  targets: readonly CampaignTarget[],
+): Promise<Map<string, readonly number[]>> {
+  const templates = await loadActiveTemplates();
+  const result = new Map<string, readonly number[]>();
+
+  for (const target of targets) {
+    const template = resolveTemplateForTarget(templates, target);
+    if (template) {
+      result.set(
+        campaignTargetKey(target),
+        template.ranges.map((range) => range.index),
+      );
+    }
+  }
+
+  return result;
 }
 
 /**

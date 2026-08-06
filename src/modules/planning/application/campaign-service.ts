@@ -2,15 +2,18 @@ import { CampaignVersionStatus, type Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
 import { recordAuditEvent } from "@/modules/audit/application/audit-writer";
 import {
+  campaignTargetKey,
   classifyCampaignChange,
   computeCampaignMaterialHash,
   validateCampaignConfiguration,
   type CampaignChangeClassification,
   type CampaignConfiguration,
   type CampaignSegment,
+  type CampaignTarget,
 } from "../domain/campaign";
 import { hasBlockingErrors, type ValidationFinding } from "../domain/validation";
 import { parseCampaignSegments, serializeCampaignSegments } from "./campaign-snapshot";
+import { loadRangeIndexesByTarget } from "./scope-catalog-builder";
 
 export type CampaignConfigurationInput = {
   name: string;
@@ -52,6 +55,14 @@ function normalizeOptionalText(value: string | undefined) {
   return trimmed ? trimmed : undefined;
 }
 
+function uniqueTargets(configuration: CampaignConfiguration): CampaignTarget[] {
+  const byKey = new Map<string, CampaignTarget>();
+  for (const segment of configuration.segments) {
+    byKey.set(campaignTargetKey(segment.target), segment.target);
+  }
+  return [...byKey.values()];
+}
+
 function toConfiguration(input: CampaignConfigurationInput): CampaignConfiguration {
   return {
     name: input.name.trim(),
@@ -61,11 +72,17 @@ function toConfiguration(input: CampaignConfigurationInput): CampaignConfigurati
   };
 }
 
-/** Corta si la validación de dominio produjo errores; devuelve las advertencias. */
-function assertValidConfiguration(
+/**
+ * Corta si la validación de dominio produjo errores; devuelve las advertencias.
+ * Consulta el catálogo real para saber qué tramos existen por alcance (CMP-007):
+ * sin esto, una campaña podía referenciar un tramo inexistente y la regla se
+ * ignoraba en silencio al proyectarse.
+ */
+async function assertValidConfiguration(
   configuration: CampaignConfiguration,
-): readonly ValidationFinding[] {
-  const findings = validateCampaignConfiguration(configuration);
+): Promise<readonly ValidationFinding[]> {
+  const validRangeIndexesByTarget = await loadRangeIndexesByTarget(uniqueTargets(configuration));
+  const findings = validateCampaignConfiguration(configuration, validRangeIndexesByTarget);
 
   if (hasBlockingErrors(findings)) {
     const firstError = findings.find((finding) => finding.severity === "ERROR");
@@ -82,7 +99,7 @@ function assertValidConfiguration(
 
 export async function createCampaign(input: CreateCampaignInput) {
   const configuration = toConfiguration(input);
-  const findings = assertValidConfiguration(configuration);
+  const findings = await assertValidConfiguration(configuration);
   const canonicalHash = computeCampaignMaterialHash(configuration);
   const configurationSnapshot = serializeCampaignSegments(configuration.segments);
 
@@ -166,7 +183,7 @@ export async function updateCampaignConfiguration(
   }
 
   const after = toConfiguration(input);
-  const findings = assertValidConfiguration(after);
+  const findings = await assertValidConfiguration(after);
 
   const before: CampaignConfiguration = {
     name: existing.name,

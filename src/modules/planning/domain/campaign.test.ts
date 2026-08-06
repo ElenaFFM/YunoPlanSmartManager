@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildTemporalRules,
+  campaignTargetKey,
   classifyCampaignChange,
   computeCampaignMaterialHash,
   validateCampaignConfiguration,
@@ -182,6 +183,35 @@ describe("validateCampaignConfiguration", () => {
 
     assert.deepEqual(codes(repeated), ["CMP-007"]);
     assert.deepEqual(codes(invalid), ["CMP-007"]);
+  });
+
+  it("CMP-007: rechaza un tramo que no existe para el alcance según el catálogo real", () => {
+    const configuration = validConfiguration();
+    const validRangeIndexes = new Map([
+      [campaignTargetKey({ type: "BANK", bankId: "bna" }), [1, 2, 3]],
+    ]);
+
+    const findings = validateCampaignConfiguration(configuration, validRangeIndexes);
+
+    assert.deepEqual(codes(findings), ["CMP-007"]);
+    assert.match(findings[0].message, /no tiene un tramo 4/);
+  });
+
+  it("CMP-007: no chequea límites de tramo cuando no se provee el catálogo", () => {
+    // Comportamiento previo a esta validación: sin información del catálogo,
+    // no se puede saber qué tramos existen, así que no se bloquea.
+    const findings = validateCampaignConfiguration(validConfiguration());
+
+    assert.deepEqual(findings, []);
+  });
+
+  it("CMP-007: acepta un tramo que sí existe según el catálogo real", () => {
+    const configuration = validConfiguration();
+    const validRangeIndexes = new Map([
+      [campaignTargetKey({ type: "BANK", bankId: "bna" }), [1, 2, 3, 4]],
+    ]);
+
+    assert.deepEqual(validateCampaignConfiguration(configuration, validRangeIndexes), []);
   });
 });
 

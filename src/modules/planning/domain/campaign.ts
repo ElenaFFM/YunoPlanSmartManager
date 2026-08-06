@@ -32,7 +32,7 @@ export type CampaignConfiguration = {
   segments: readonly CampaignSegment[];
 };
 
-function targetKey(target: CampaignTarget): string {
+export function campaignTargetKey(target: CampaignTarget): string {
   return target.type === "BANK" ? `BANK:${target.bankId}` : target.type;
 }
 
@@ -48,6 +48,15 @@ function windowsOverlap(left: CampaignSegment, right: CampaignSegment): boolean 
 }
 
 /**
+ * Índices de tramo (`rangeIndex`) que realmente existen para cada alcance,
+ * según la plantilla activa del catálogo. Clave: `campaignTargetKey(target)`.
+ * Es opcional porque este módulo es dominio puro y no lee el catálogo: cuando
+ * el llamador no la provee (p. ej. los tests de dominio), el chequeo se omite,
+ * igual que antes de que existiera esta validación.
+ */
+export type TargetRangeIndexes = ReadonlyMap<string, readonly number[]>;
+
+/**
  * Valida una configuración de campaña según 14_VALIDATION_CATALOG.md §3.
  *
  * Cubre CMP-001 a CMP-007. Quedan fuera, por depender de datos que el dominio
@@ -57,6 +66,7 @@ function windowsOverlap(left: CampaignSegment, right: CampaignSegment): boolean 
  */
 export function validateCampaignConfiguration(
   configuration: CampaignConfiguration,
+  validRangeIndexesByTarget?: TargetRangeIndexes,
 ): readonly ValidationFinding[] {
   const findings: ValidationFinding[] = [];
 
@@ -92,7 +102,7 @@ export function validateCampaignConfiguration(
       findings.push({
         code: "CMP-001",
         severity: "ERROR",
-        message: `El alcance "${targetKey(segment.target)}" no define cambios en ningún tramo.`,
+        message: `El alcance "${campaignTargetKey(segment.target)}" no define cambios en ningún tramo.`,
         field: `segments.${segment.id}.rangeChanges`,
       });
     }
@@ -101,7 +111,7 @@ export function validateCampaignConfiguration(
       findings.push({
         code: "CMP-002",
         severity: "ERROR",
-        message: `El alcance "${targetKey(segment.target)}" tiene una fecha de inicio inválida.`,
+        message: `El alcance "${campaignTargetKey(segment.target)}" tiene una fecha de inicio inválida.`,
         field: `segments.${segment.id}.startAt`,
       });
     }
@@ -111,14 +121,14 @@ export function validateCampaignConfiguration(
         findings.push({
           code: "CMP-002",
           severity: "ERROR",
-          message: `El alcance "${targetKey(segment.target)}" tiene una fecha de fin inválida.`,
+          message: `El alcance "${campaignTargetKey(segment.target)}" tiene una fecha de fin inválida.`,
           field: `segments.${segment.id}.endAt`,
         });
       } else if (isValidDate(segment.startAt) && segment.endAt <= segment.startAt) {
         findings.push({
           code: "CMP-003",
           severity: "ERROR",
-          message: `El alcance "${targetKey(segment.target)}" debe finalizar después de su inicio.`,
+          message: `El alcance "${campaignTargetKey(segment.target)}" debe finalizar después de su inicio.`,
           field: `segments.${segment.id}.endAt`,
         });
       }
@@ -126,7 +136,7 @@ export function validateCampaignConfiguration(
       findings.push({
         code: "CMP-004",
         severity: "WARNING",
-        message: `El alcance "${targetKey(segment.target)}" queda vigente sin fecha de finalización; requiere confirmación explícita.`,
+        message: `El alcance "${campaignTargetKey(segment.target)}" queda vigente sin fecha de finalización; requiere confirmación explícita.`,
         field: `segments.${segment.id}.endAt`,
       });
     }
@@ -137,7 +147,7 @@ export function validateCampaignConfiguration(
         findings.push({
           code: "CMP-007",
           severity: "ERROR",
-          message: `El alcance "${targetKey(segment.target)}" referencia un tramo inválido (${rangeChange.rangeIndex}).`,
+          message: `El alcance "${campaignTargetKey(segment.target)}" referencia un tramo inválido (${rangeChange.rangeIndex}).`,
           field: `segments.${segment.id}.rangeChanges`,
         });
         continue;
@@ -147,11 +157,21 @@ export function validateCampaignConfiguration(
         findings.push({
           code: "CMP-007",
           severity: "ERROR",
-          message: `El alcance "${targetKey(segment.target)}" define el tramo ${rangeChange.rangeIndex} más de una vez.`,
+          message: `El alcance "${campaignTargetKey(segment.target)}" define el tramo ${rangeChange.rangeIndex} más de una vez.`,
           field: `segments.${segment.id}.rangeChanges`,
         });
       }
       seenRangeIndexes.add(rangeChange.rangeIndex);
+
+      const validRangeIndexes = validRangeIndexesByTarget?.get(campaignTargetKey(segment.target));
+      if (validRangeIndexes && !validRangeIndexes.includes(rangeChange.rangeIndex)) {
+        findings.push({
+          code: "CMP-007",
+          severity: "ERROR",
+          message: `El alcance "${campaignTargetKey(segment.target)}" no tiene un tramo ${rangeChange.rangeIndex} (tramos válidos: ${validRangeIndexes.join(", ")}).`,
+          field: `segments.${segment.id}.rangeChanges`,
+        });
+      }
     }
   }
 
@@ -170,7 +190,7 @@ function findOverlappingSegments(
       const left = segments[i];
       const right = segments[j];
 
-      if (targetKey(left.target) !== targetKey(right.target)) {
+      if (campaignTargetKey(left.target) !== campaignTargetKey(right.target)) {
         continue;
       }
       if (!isValidDate(left.startAt) || !isValidDate(right.startAt)) {
@@ -186,7 +206,7 @@ function findOverlappingSegments(
       findings.push({
         code: left.target.type === "GENERAL" ? "CMP-006" : "CMP-005",
         severity: "ERROR",
-        message: `El alcance "${targetKey(left.target)}" tiene dos configuraciones con vigencias superpuestas.`,
+        message: `El alcance "${campaignTargetKey(left.target)}" tiene dos configuraciones con vigencias superpuestas.`,
         field: `segments.${left.id}`,
       });
     }
@@ -223,7 +243,7 @@ function normalizeTransformation(transformation: InstallmentTransformation): unk
  */
 function toMaterialSegment(segment: CampaignSegment): unknown {
   return {
-    target: targetKey(segment.target),
+    target: campaignTargetKey(segment.target),
     startAt: isValidDate(segment.startAt) ? segment.startAt.toISOString() : null,
     endAt: segment.endAt !== null && isValidDate(segment.endAt) ? segment.endAt.toISOString() : null,
     rangeChanges: [...segment.rangeChanges]
@@ -297,10 +317,10 @@ export function buildTemporalRules(
   target: CampaignTarget,
   rangeIndex: number,
 ): readonly TemporalRule[] {
-  const key = targetKey(target);
+  const key = campaignTargetKey(target);
 
   const rules = configuration.segments
-    .filter((segment) => targetKey(segment.target) === key)
+    .filter((segment) => campaignTargetKey(segment.target) === key)
     .flatMap((segment) => {
       const rangeChange = segment.rangeChanges.find(
         (candidate) => candidate.rangeIndex === rangeIndex,
