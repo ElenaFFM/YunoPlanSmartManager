@@ -13,7 +13,7 @@ import {
 } from "../domain/campaign";
 import { hasBlockingErrors, type ValidationFinding } from "../domain/validation";
 import { parseCampaignSegments, serializeCampaignSegments } from "./campaign-snapshot";
-import { loadRangeIndexesByTarget } from "./scope-catalog-builder";
+import { loadBaselineInstallmentsByTarget, loadRangeIndexesByTarget } from "./scope-catalog-builder";
 
 export type CampaignConfigurationInput = {
   name: string;
@@ -81,8 +81,16 @@ function toConfiguration(input: CampaignConfigurationInput): CampaignConfigurati
 async function assertValidConfiguration(
   configuration: CampaignConfiguration,
 ): Promise<readonly ValidationFinding[]> {
-  const validRangeIndexesByTarget = await loadRangeIndexesByTarget(uniqueTargets(configuration));
-  const findings = validateCampaignConfiguration(configuration, validRangeIndexesByTarget);
+  const targets = uniqueTargets(configuration);
+  const [validRangeIndexesByTarget, baselineInstallmentsByTarget] = await Promise.all([
+    loadRangeIndexesByTarget(targets),
+    loadBaselineInstallmentsByTarget(targets),
+  ]);
+  const findings = validateCampaignConfiguration(
+    configuration,
+    validRangeIndexesByTarget,
+    baselineInstallmentsByTarget,
+  );
 
   if (hasBlockingErrors(findings)) {
     const firstError = findings.find((finding) => finding.severity === "ERROR");

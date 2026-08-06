@@ -191,6 +191,32 @@ export async function loadRangeIndexesByTarget(
   return result;
 }
 
+/**
+ * Set de cuotas vigente por alcance y tramo según la plantilla activa. Se usa
+ * para CMP-013 (detectar transformaciones que no cambian nada respecto del
+ * baseline). Mismo criterio de "alcance sin plantilla activa se omite" que
+ * `loadRangeIndexesByTarget`.
+ */
+export async function loadBaselineInstallmentsByTarget(
+  targets: readonly CampaignTarget[],
+): Promise<Map<string, Map<number, ReturnType<typeof createInstallmentSet>>>> {
+  const templates = await loadActiveTemplates();
+  const result = new Map<string, Map<number, ReturnType<typeof createInstallmentSet>>>();
+
+  for (const target of targets) {
+    const template = resolveTemplateForTarget(templates, target);
+    if (!template) continue;
+
+    const byRange = new Map<number, ReturnType<typeof createInstallmentSet>>();
+    for (const range of template.ranges) {
+      byRange.set(range.index, createInstallmentSet(range.installments));
+    }
+    result.set(campaignTargetKey(target), byRange);
+  }
+
+  return result;
+}
+
 type RuleContribution = { campaignId: string; rule: TemporalRule };
 
 /** Mismo criterio de intervalo semiabierto que `timeline.ts`/`campaign.ts`. */

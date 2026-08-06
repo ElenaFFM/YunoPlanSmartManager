@@ -42,6 +42,7 @@ Cada validación debe tener código estable, mensaje para usuario, detalle técn
 | `CMP-010` | Transformación conserva opciones inferiores exactas | ERROR |
 | `CMP-011` | Cambio estructural crea nueva versión | ERROR interno |
 | `CMP-012` | Combinación o monto fuera del patrón histórico | WARNING |
+| `CMP-013` | Transformación cambia el set de cuotas respecto del baseline vigente | WARNING |
 
 ## 4. Proyección temporal
 

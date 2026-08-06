@@ -111,6 +111,8 @@ Ejemplo sobre `[12, 9, 6, 3, 1]`:
 
 La configuración sobre la que se aplica una transformación es la proyectada inmediatamente antes del inicio de la campaña, no necesariamente la configuración actual.
 
+**Cuidado con `CAP_MAX_INSTALLMENT`**: solo *quita* opciones por encima del máximo indicado; nunca agrega. Si el máximo pedido es mayor o igual que el máximo ya vigente, el resultado es idéntico al baseline (no-op) — es un error común confundirlo con "agregar cuotas más largas", que requiere `ADD_EXACT_INSTALLMENTS`. `CMP-013` (ver `14_VALIDATION_CATALOG.md`) detecta este caso y advierte, sin bloquear el guardado.
+
 ## 5. Proyección temporal
 
 El motor debe construir una línea de tiempo con todos los puntos de cambio relevantes:
