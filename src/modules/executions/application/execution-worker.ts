@@ -21,6 +21,7 @@ import {
   assertRemotePlanMatchesExpectation,
   type RemotePlanVerificationExpectation,
   RemotePlanVerificationMismatchError,
+  valuesMatchNormalizingTimestamps,
 } from "./remote-plan-verification";
 import { toRemotePlanSnapshot } from "./remote-plan-snapshot";
 
@@ -181,7 +182,7 @@ function assertUpdateApplied(requestSnapshot: UpdateInstallmentPlanInput, retrie
   for (const key of Object.keys(requestSnapshot) as (keyof UpdateInstallmentPlanInput)[]) {
     const expectedValue = requestSnapshot[key];
     const actualValue = retrieved[key];
-    if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+    if (!valuesMatchNormalizingTimestamps(expectedValue, actualValue)) {
       throw new RemotePlanVerificationMismatchError(
         `El campo "${key}" del plan ${retrieved.id} no refleja el UPDATE enviado.`,
       );
