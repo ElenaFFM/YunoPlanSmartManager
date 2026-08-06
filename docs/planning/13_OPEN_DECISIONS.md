@@ -79,7 +79,7 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Importación inicial
 
-**Cerrada (2026-08-06):** la carga inicial usa un CSV versionado con un registro por plan remoto y columnas mínimas de ID Yuno, cuenta, ambiente, nombre, alcance inferido o `UNCLASSIFIED`, BIN/IIN, rango, cuotas, disponibilidad, timestamps y payload crudo normalizado. El archivo se valida en seco, se conserva con hash y fecha de corte UTC y recién después se importa. Un `ADMIN` valida el archivo y otro `OPERATOR` puede revisar el resumen; para MVP no se exige four-eyes. La fecha de corte es el instante UTC en que comienza la importación y se registra en el lote, no una fecha manual propensa a ambigüedad.
+**Cerrada (2026-08-06):** la carga inicial de planes visibles usa la lectura directa y manual de `retrieveAll` por un `ADMIN`, guardando el snapshot normalizado, actor y fecha de corte UTC. El primer baseline sandbox (20 planes) se capturó así el 2026-08-06 sin escrituras en Yuno. Los futuros o vencidos, que Yuno no expone en ese endpoint, se cargan asistidamente por ID y quedan pendientes de reconciliación. Para MVP no se exige four-eyes; un `OPERATOR` puede revisar el resumen.
 
 ### Backups y retención
 

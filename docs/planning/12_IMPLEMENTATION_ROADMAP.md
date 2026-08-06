@@ -144,7 +144,7 @@ Un usuario puede crear y validar un borrador complejo sin escribir JSON.
 - [x] Modelo `RemotePlan` por ambiente, con snapshots, IDs Yuno únicos por ambiente, estado, origen, clasificación pendiente, visibilidad y relaciones opcionales de reemplazo/deployment. Migración `20260806150000_remote_plans` aplicada en PostgreSQL de pruebas.
 - [x] Adapter de lectura reutilizable y endpoint `GET/POST /api/planning/remote-plans`: lectura del registro local e importación manual de planes visibles de sandbox, restringida a `ADMIN`.
 - [x] Importación idempotente de planes vigentes visibles: conserva snapshot y timestamps, crea/actualiza por `environment + yunoPlanId` y audita el lote. La ausencia de un plan en `retrieveAll` no borra ni altera registros locales porque Yuno oculta futuros y vencidos.
-- [ ] Primera carga manual de sandbox por un `ADMIN`, una vez revisadas las credenciales y la cuenta objetivo.
+- [x] Primera carga manual de sandbox por un `ADMIN`: el 2026-08-06 se importaron los 20 planes visibles de la cuenta de pruebas (20 creados, 0 actualizados). No se realizaron escrituras en Yuno.
 - [ ] Carga asistida de futuros conocidos por ID (Yuno no los devuelve en `retrieveAll`).
 - [ ] Clasificación y reconciliación inicial.
 - [ ] `RemotePlan` de producción con credenciales y gates separados.

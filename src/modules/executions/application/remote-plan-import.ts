@@ -110,7 +110,7 @@ export async function importVisibleSandboxRemotePlans(
     });
 
     return { created, updated };
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return {
     environment: Environment.SANDBOX,
