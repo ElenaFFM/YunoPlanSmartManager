@@ -1,6 +1,7 @@
 import { computeCanonicalHash } from "@/modules/planning/domain/canonical-hash";
 import { prisma } from "@/infrastructure/database/prisma";
 import { enqueueSandboxExecutionPlan } from "./execution-plan-service";
+import { createRemotePlanVerificationExpectation } from "./remote-plan-verification";
 
 export class SandboxVerificationPlanError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -64,7 +65,7 @@ export async function enqueueCampaignSandboxVerification(input: {
         operations: remotePlans.map((plan) => ({
           type: "VERIFY" as const,
           targetRemotePlanId: plan.id,
-          expectedResultSnapshot: { yunoPlanId: plan.yunoPlanId, remoteUpdatedAt: plan.remoteUpdatedAt.toISOString() },
+          expectedResultSnapshot: createRemotePlanVerificationExpectation(plan),
         })),
       },
     });

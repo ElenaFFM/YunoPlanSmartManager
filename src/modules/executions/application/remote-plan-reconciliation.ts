@@ -1,6 +1,11 @@
 import { Environment, RemotePlanImportStatus } from "@/generated/prisma/client";
 import { prisma } from "@/infrastructure/database/prisma";
 import { recordAuditEvent } from "@/modules/audit/application/audit-writer";
+import {
+  assertRemotePlanClassificationReady,
+  InvalidRemotePlanLogicalKeyError,
+  isRemotePlanClassificationReady,
+} from "../domain/remote-plan-logical-key";
 
 export class RemotePlanReconciliationError extends Error {
   readonly code: string;
@@ -32,7 +37,7 @@ export async function updateSandboxRemotePlanClassification(
   return prisma.$transaction(async (transaction) => {
     const existing = await transaction.remotePlan.findFirst({
       where: { id: remotePlanId, environment: Environment.SANDBOX },
-      select: { id: true, importStatus: true },
+      select: { id: true, importStatus: true, rangeIndex: true, equivalentLogicalKey: true },
     });
     if (!existing) {
       throw new RemotePlanReconciliationError(
@@ -40,6 +45,22 @@ export async function updateSandboxRemotePlanClassification(
         "No existe el plan remoto sandbox indicado.",
         404,
       );
+    }
+
+    const rangeIndex = input.rangeIndex === undefined ? existing.rangeIndex : input.rangeIndex;
+    const equivalentLogicalKey =
+      input.equivalentLogicalKey === undefined
+        ? existing.equivalentLogicalKey
+        : input.equivalentLogicalKey;
+    if (input.importStatus === "CLASSIFIED") {
+      try {
+        assertRemotePlanClassificationReady({ rangeIndex, equivalentLogicalKey });
+      } catch (error) {
+        if (error instanceof InvalidRemotePlanLogicalKeyError) {
+          throw new RemotePlanReconciliationError(error.code, error.message);
+        }
+        throw error;
+      }
     }
 
     const remotePlan = await transaction.remotePlan.update({
@@ -103,8 +124,22 @@ export async function getSandboxRemotePlanReconciliation() {
     classification[plan.importStatus.toLowerCase() as keyof typeof classification] += 1;
   }
 
+  const planningPlans = plans.filter((plan) => plan.status === "ACTIVE" || plan.status === "FUTURE");
+  const planningBlockers = planningPlans.filter(
+    (plan) =>
+      !isRemotePlanClassificationReady(plan),
+  );
+
   return {
-    summary: { total: plans.length, lifecycle, classification },
-    reviewQueue: plans.filter((plan) => plan.importStatus !== RemotePlanImportStatus.CLASSIFIED),
+    summary: {
+      total: plans.length,
+      lifecycle,
+      classification,
+      readyForPlanning: planningPlans.length > 0 && planningBlockers.length === 0,
+      // Si no hay ningún plan operativo local, no existe un baseline sobre el
+      // que calcular un cambio: se expone como un bloqueo global en la UI.
+      planningBlockers: planningPlans.length === 0 ? 1 : planningBlockers.length,
+    },
+    reviewQueue: plans.filter((plan) => !isRemotePlanClassificationReady(plan)),
   };
 }

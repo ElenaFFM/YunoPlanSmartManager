@@ -46,8 +46,11 @@ export function buildExecutionPlan(input: ExecutionPlanInput): ExecutionPlan {
 
   let deleteSeen = false;
   const operations = input.operations.map((operation, index) => {
-    if (operation.type === "VERIFY" && !operation.targetRemotePlanId) {
-      throw new InvalidExecutionPlanError("EXEC-PLAN-003", "VERIFY requiere un plan remoto objetivo.");
+    if (operation.type === "VERIFY" && (!operation.targetRemotePlanId || !operation.expectedResultSnapshot)) {
+      throw new InvalidExecutionPlanError(
+        "EXEC-PLAN-003",
+        "VERIFY requiere un plan remoto objetivo y un baseline esperado.",
+      );
     }
     if ((operation.type === "UPDATE" || operation.type === "DELETE") && !operation.targetRemotePlanId) {
       throw new InvalidExecutionPlanError("EXEC-PLAN-004", `${operation.type} requiere un plan remoto objetivo.`);

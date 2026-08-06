@@ -128,7 +128,7 @@ Fase cerrada salvo property-based tests (deliberadamente postergadas) y la trans
 
 ## Fase 4: UX de planificación
 
-- [ ] Dashboard operativo (depende de estados de ejecución e importación remota).
+- [ ] Dashboard operativo de campañas y ejecuciones pendiente; ya existe el tablero de reconciliación en `/planning/remotos`, con inventario sandbox, importación manual de visibles/IDs conocidos y clasificación auditada.
 - [x] Calendario/timeline inicial accesible en `/planning/campanas`: barras visuales por alcance y tabla cronológica equivalente; no hay edición directa sobre el calendario.
 - [x] Asistente de campaña por pasos en `/planning/campanas`: datos comerciales, vigencia/cuotas y revisión antes de guardar. Valida los datos mínimos de cada paso y conserva la validación completa en servidor; el guardado crea o versiona un `DRAFT`, sin ejecutar operaciones.
 - [x] Tabla de impacto lógico por segmento, con antes/durante/después respecto de la plantilla activa. La comparación con planes remotos se completará después de la importación/reconciliación (Fase 5).
@@ -146,7 +146,7 @@ Un usuario puede crear y validar un borrador complejo sin escribir JSON.
 - [x] Importación idempotente de planes vigentes visibles: conserva snapshot y timestamps, crea/actualiza por `environment + yunoPlanId` y audita el lote. La ausencia de un plan en `retrieveAll` no borra ni altera registros locales porque Yuno oculta futuros y vencidos.
 - [x] Primera carga manual de sandbox por un `ADMIN`: el 2026-08-06 se importaron los 20 planes visibles de la cuenta de pruebas (20 creados, 0 actualizados). No se realizaron escrituras en Yuno.
 - [x] Carga asistida por IDs conocidos en `POST /api/planning/remote-plans/known`: admite hasta 50 IDs, los lee secuencialmente desde Yuno sandbox, es idempotente y audita el lote. Permite registrar planes futuros o vencidos que `retrieveAll` no devuelve; sigue pendiente ingresar los IDs comerciales concretos cuando existan.
-- [x] Clasificación y reconciliación inicial: `GET /api/planning/remote-plans/reconciliation` expone el inventario local y su cola de revisión; `PATCH /api/planning/remote-plans/:id` permite que un `ADMIN` clasifique como `CLASSIFIED` o `ANOMALY`, agregue asociaciones opcionales y deje auditoría. No infiere coincidencias comerciales ni cambia Yuno: las asociaciones quedan pendientes de confirmación humana.
+- [x] Clasificación y reconciliación inicial: `GET /api/planning/remote-plans/reconciliation` expone el inventario local, su cola de revisión y si el baseline está listo para planificar; `PATCH /api/planning/remote-plans/:id` permite que un `ADMIN` clasifique como `CLASSIFIED` o `ANOMALY`. Un clasificado requiere tramo y clave lógica canónica (`GENERAL:<tramo>`, `AMEX:<tramo>` o `BANK:<id-banco>:<tramo>`) coherentes; esto evita asociaciones ambiguas para el planificador. La UI `/planning/remotos` permite actualizar el inventario, importar IDs conocidos y realizar esa revisión. No infiere coincidencias comerciales ni cambia Yuno: las asociaciones quedan pendientes de confirmación humana.
 - [ ] `RemotePlan` de producción con credenciales y gates separados.
 - [x] Asociaciones opcionales mientras un plan importado se clasifica (`rangeIndex`, `segmentKey`, `equivalentLogicalKey`), siempre confirmadas manualmente y auditadas.
 
@@ -158,7 +158,7 @@ La DB representa el baseline aceptado de sandbox y producción.
 
 - [x] `ExecutionPlan` inmutable: operaciones secuenciadas, hash canónico que cubre baseline/configuración/payloads, precondiciones básicas y `DELETE` al final. `enqueueSandboxExecutionPlan` lo persiste como `ExecutionRun` + operaciones, aplica lock por alcance e idempotencia y audita el encolado. Aún no se expone como comando HTTP hasta conectar el planificador comercial server-side.
   - `POST /api/planning/campaigns/:id/sandbox-verification` ya genera server-side un plan `VERIFY` a partir de la versión actual de la campaña y el baseline sandbox (planes activos/futuros), sin recibir operaciones ni payloads de Yuno desde el cliente.
-- [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa `VERIFY` secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Escrituras siguen bloqueadas hasta completar planificador y compensaciones.
+- [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa `VERIFY` secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Cada `VERIFY` compara ID, `updated_at` y hash de la respuesta completa contra el baseline inmutable; un drift confirmado detiene la ejecución, queda registrado y exige reconciliación antes de permitir otro run para ese alcance. Escrituras siguen bloqueadas hasta completar planificador y compensaciones.
 - [x] polling, claim atómico, lease y heartbeat.
 - create/update/delete/verify.
 - [x] locks e idempotencia local al encolar un `ExecutionPlan` sandbox.

@@ -2,6 +2,11 @@ import { DeploymentStatus, ExecutionRunStatus, OperationStatus, type PrismaClien
 import { renewExecutionRunLease, type ClaimExecutionRunOptions } from "@/modules/executions/infrastructure/execution-run-queue";
 import type { YunoInstallmentPlansClient } from "../infrastructure/yuno-client";
 import { YunoApiError } from "../infrastructure/yuno-client";
+import {
+  assertRemotePlanMatchesExpectation,
+  type RemotePlanVerificationExpectation,
+  RemotePlanVerificationMismatchError,
+} from "./remote-plan-verification";
 
 export type ExecuteClaimedRunInput = {
   database: PrismaClient;
@@ -25,7 +30,12 @@ async function finishRun(database: PrismaClient, runId: string, status: Executio
   await database.deployment.update({
     where: { id: run.deploymentId },
     data: {
-      status: status === "SUCCEEDED" ? DeploymentStatus.SUCCEEDED : DeploymentStatus.FAILED,
+      status:
+        status === "SUCCEEDED"
+          ? DeploymentStatus.SUCCEEDED
+          : status === "RECONCILIATION_REQUIRED"
+            ? DeploymentStatus.RECONCILIATION_REQUIRED
+            : DeploymentStatus.FAILED,
     },
   });
 }
@@ -77,6 +87,10 @@ export async function executeClaimedSandboxRun(input: ExecuteClaimedRunInput): P
 
     try {
       const response = await input.client.retrieve(remotePlan.yunoPlanId);
+      assertRemotePlanMatchesExpectation(
+        response,
+        operation.expectedResultSnapshot as unknown as RemotePlanVerificationExpectation,
+      );
       await input.database.$transaction(async (transaction) => {
         await transaction.executionOperation.update({
           where: { id: operation.id },
@@ -93,6 +107,20 @@ export async function executeClaimedSandboxRun(input: ExecuteClaimedRunInput): P
         });
       });
     } catch (error) {
+      if (error instanceof RemotePlanVerificationMismatchError) {
+        await input.database.executionOperation.update({
+          where: { id: operation.id },
+          data: {
+            status: "FAILED",
+            finishedAt: new Date(),
+            resultCertainty: "FAILED",
+            errorCode: error.code,
+            errorMessage: error.message,
+          },
+        });
+        await finishRun(input.database, input.runId, "RECONCILIATION_REQUIRED", "BASELINE_DRIFT");
+        return;
+      }
       const confirmedFailure = error instanceof YunoApiError;
       await input.database.executionOperation.update({
         where: { id: operation.id },

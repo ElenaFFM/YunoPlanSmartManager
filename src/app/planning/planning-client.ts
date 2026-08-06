@@ -76,6 +76,42 @@ export type ExecutionRunProgress = {
   operations: Array<{ id: string; sequence: number; type: string; status: string; resultCertainty: string | null; errorMessage: string | null }>;
 };
 
+export type RemotePlanReview = {
+  id: string;
+  yunoPlanId: string;
+  name: string;
+  status: "ACTIVE" | "FUTURE" | "EXPIRED" | "DELETED" | "UNKNOWN";
+  importStatus: "PENDING" | "CLASSIFIED" | "ANOMALY";
+  rangeIndex: number | null;
+  segmentKey: string | null;
+  equivalentLogicalKey: string | null;
+  startAt: string | null;
+  finishAt: string | null;
+  lastSeenAt: string | null;
+  importNotes: unknown;
+};
+
+export type RemotePlanReconciliation = {
+  summary: {
+    total: number;
+    lifecycle: Record<"active" | "future" | "expired" | "deleted" | "unknown", number>;
+    classification: Record<"pending" | "classified" | "anomaly", number>;
+    readyForPlanning: boolean;
+    planningBlockers: number;
+  };
+  reviewQueue: RemotePlanReview[];
+};
+
+export type RemotePlanImportResult = {
+  environment: "SANDBOX";
+  accountId: string;
+  readAt: string;
+  total: number;
+  created: number;
+  updated: number;
+  planIds?: string[];
+};
+
 export class PlanningApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -139,4 +175,38 @@ export function enqueueSandboxVerification(userId: string, campaignId: string, i
 
 export function getExecutionRunProgress(userId: string, runId: string) {
   return apiFetch<ExecutionRunProgress>(userId, `/api/planning/execution-runs/${runId}`);
+}
+
+export function getRemotePlanReconciliation(userId: string) {
+  return apiFetch<RemotePlanReconciliation>(userId, "/api/planning/remote-plans/reconciliation");
+}
+
+/** Lectura remota manual: importa solo planes vigentes visibles en sandbox. */
+export function importVisibleRemotePlans(userId: string) {
+  return apiFetch<RemotePlanImportResult>(userId, "/api/planning/remote-plans", { method: "POST" });
+}
+
+/** Lectura asistida para futuros/vencidos que Yuno no muestra en retrieveAll. */
+export function importKnownRemotePlans(userId: string, planIds: string[]) {
+  return apiFetch<RemotePlanImportResult>(userId, "/api/planning/remote-plans/known", {
+    method: "POST",
+    body: JSON.stringify({ planIds }),
+  });
+}
+
+export function classifyRemotePlan(
+  userId: string,
+  remotePlanId: string,
+  input: {
+    importStatus: "CLASSIFIED" | "ANOMALY";
+    rangeIndex?: number | null;
+    segmentKey?: string | null;
+    equivalentLogicalKey?: string | null;
+    note?: string;
+  },
+) {
+  return apiFetch<RemotePlanReview>(userId, `/api/planning/remote-plans/${remotePlanId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
