@@ -10,6 +10,11 @@ import {
 import { InvalidTemplateSnapshotError } from "../application/template-snapshot";
 import { InvalidScopeCatalogError } from "../domain/catalog-validation";
 import { NoMatchingRangeError } from "../domain/effective-configuration";
+import {
+  InvalidRemotePlanSnapshotError,
+} from "@/modules/executions/application/remote-plan-snapshot";
+import { RemotePlanImportError } from "@/modules/executions/application/remote-plan-import";
+import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 
 export const effectiveConfigurationQuerySchema = z.object({
   bin: z.string().regex(/^\d{6,8}$/, "El BIN debe tener entre 6 y 8 dígitos."),
@@ -97,6 +102,20 @@ export function planningErrorResponse(error: unknown) {
     return NextResponse.json(
       { error: { code: "CMP-RANGE-404", message: error.message } },
       { status: 404 },
+    );
+  }
+
+  if (error instanceof RemotePlanImportError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: error.status },
+    );
+  }
+
+  if (error instanceof InvalidRemotePlanSnapshotError || error instanceof YunoApiError) {
+    return NextResponse.json(
+      { error: { code: "REMOTE_READ_FAILED", message: "No se pudo interpretar la respuesta de Yuno." } },
+      { status: 502 },
     );
   }
 

@@ -47,11 +47,8 @@ export type YunoContractTestCredentials = {
   accountId: string;
 };
 
-/**
- * Los contract tests son manuales (10_TEST_STRATEGY.md §7), por eso las
- * credenciales son opcionales en el schema general pero requeridas acá.
- */
-export function getYunoContractTestCredentials(
+/** Credenciales sandbox compartidas por los contract tests y por importaciones de solo lectura. */
+export function getYunoSandboxCredentials(
   environment: ServerEnvironment = getServerEnvironment(),
 ): YunoContractTestCredentials {
   const missing = (
@@ -59,9 +56,7 @@ export function getYunoContractTestCredentials(
   ).filter((key) => !environment[key]);
 
   if (missing.length > 0) {
-    throw new Error(
-      `Faltan variables de entorno para correr el contract test de Yuno: ${missing.join(", ")}.`,
-    );
+    throw new Error(`Faltan credenciales sandbox de Yuno: ${missing.join(", ")}.`);
   }
 
   return {
@@ -70,4 +65,14 @@ export function getYunoContractTestCredentials(
     privateSecretKey: environment.YUNO_PRIVATE_SECRET_KEY!,
     accountId: environment.YUNO_CONTRACT_TEST_ACCOUNT_ID!,
   };
+}
+
+/**
+ * Los contract tests son manuales (10_TEST_STRATEGY.md §7), por eso las
+ * credenciales son opcionales en el schema general pero requeridas acá.
+ */
+export function getYunoContractTestCredentials(
+  environment: ServerEnvironment = getServerEnvironment(),
+): YunoContractTestCredentials {
+  return getYunoSandboxCredentials(environment);
 }
