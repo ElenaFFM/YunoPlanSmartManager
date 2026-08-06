@@ -173,6 +173,11 @@ export function enqueueSandboxVerification(userId: string, campaignId: string, i
   return apiFetch<ExecutionRunProgress>(userId, `/api/planning/campaigns/${campaignId}/sandbox-verification`, { method: "POST", body: JSON.stringify({ idempotencyKey }) });
 }
 
+/** Despliega de verdad (create/update/delete) la versión actual de la campaña al sandbox de Yuno. */
+export function enqueueSandboxDeployment(userId: string, campaignId: string, idempotencyKey: string) {
+  return apiFetch<ExecutionRunProgress>(userId, `/api/planning/campaigns/${campaignId}/sandbox-deployment`, { method: "POST", body: JSON.stringify({ idempotencyKey }) });
+}
+
 export function getExecutionRunProgress(userId: string, runId: string) {
   return apiFetch<ExecutionRunProgress>(userId, `/api/planning/execution-runs/${runId}`);
 }

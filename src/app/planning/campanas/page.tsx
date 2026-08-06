@@ -16,6 +16,7 @@ import {
   type InstallmentTransformation,
   type ValidationFinding,
   enqueueSandboxVerification,
+  enqueueSandboxDeployment,
   getExecutionRunProgress,
   type ExecutionRunProgress,
 } from "../planning-client";
@@ -292,6 +293,7 @@ function CampaignCard({
       <CampaignImpact campaign={campaign} banks={banks} />
       <CampaignVersionHistory campaign={campaign} />
       {isAdmin && <CampaignVerification campaignId={campaign.id} userId={userId} />}
+      {isAdmin && <CampaignDeployment campaignId={campaign.id} userId={userId} />}
 
       {canWrite && (
         <>
@@ -343,6 +345,70 @@ function CampaignVerification({ campaignId, userId }: { campaignId: string; user
     {error && <p className="identity-badge-error">{error}</p>}
     {run && <><p>Run {run.status} · {run.lastConfirmedOperation}/{run.operations.length} operaciones confirmadas.</p><ol>{run.operations.map((operation) => <li key={operation.id}>#{operation.sequence} {operation.type}: {operation.status}{operation.errorMessage ? ` — ${operation.errorMessage}` : ""}</li>)}</ol></>}
   </section>;
+}
+
+function CampaignDeployment({ campaignId, userId }: { campaignId: string; userId: string }) {
+  const [run, setRun] = useState<ExecutionRunProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const active = run?.status === "QUEUED" || run?.status === "RUNNING";
+  const activeRunId = active ? run?.id : null;
+  useEffect(() => {
+    if (!activeRunId) return;
+    const timer = window.setInterval(
+      () => getExecutionRunProgress(userId, activeRunId).then(setRun).catch(() => setError("No se pudo actualizar el progreso.")),
+      3_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [activeRunId, userId]);
+  async function start() {
+    setError(null);
+    setConfirming(false);
+    try {
+      setRun(await enqueueSandboxDeployment(userId, campaignId, `deploy-${campaignId}-${crypto.randomUUID()}`));
+    } catch (err) {
+      setError(err instanceof PlanningApiError ? err.message : "No se pudo encolar el despliegue.");
+    }
+  }
+  return (
+    <section className="card">
+      <h3>Despliegue sandbox</h3>
+      <p className="muted">
+        Crea, actualiza o borra installment plans reales en el sandbox de Yuno según la versión actual de la
+        campaña. A diferencia de la verificación, esto sí escribe en Yuno.
+      </p>
+      {!confirming && (
+        <button onClick={() => setConfirming(true)} disabled={active}>
+          {active ? "Despliegue en curso" : "Desplegar a sandbox"}
+        </button>
+      )}
+      {confirming && (
+        <div className="form-actions">
+          <span>¿Confirmás desplegar esta campaña al sandbox de Yuno?</span>
+          <button onClick={start}>Sí, desplegar</button>
+          <button className="secondary" onClick={() => setConfirming(false)}>
+            Cancelar
+          </button>
+        </div>
+      )}
+      {error && <p className="identity-badge-error">{error}</p>}
+      {run && (
+        <>
+          <p>
+            Run {run.status} · {run.lastConfirmedOperation}/{run.operations.length} operaciones confirmadas.
+          </p>
+          <ol>
+            {run.operations.map((operation) => (
+              <li key={operation.id}>
+                #{operation.sequence} {operation.type}: {operation.status}
+                {operation.errorMessage ? ` — ${operation.errorMessage}` : ""}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
 }
 
 function CampaignConfigurationForm({
