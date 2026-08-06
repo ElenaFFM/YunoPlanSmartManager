@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas)
+**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 avanzada con create/update/delete/verify, compensaciones e inyección de fallos en el ejecutor sandbox)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -12,12 +12,12 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 |---|---|
 | Aplicación | Next.js, TypeScript, ESLint, tests y build funcionando. CI en GitHub Actions. |
 | Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
-| Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
+| Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Ejecuta create/update/delete/verify contra sandbox con compensación automática ante fallo confirmado; sin exponerse todavía como comando HTTP hasta el planificador comercial. |
 | Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
 | Auditoría | Todas las mutaciones del catálogo y de campañas generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de ejecuciones pendiente de que existan. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
 | Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico, invalidación por versión y generación de casos SDK. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). API HTTP y UI en `/planning/campanas` ya expuestas; falta la transición `DRAFT`→`VALIDATED` (Fase 7/8). |
-| Yuno | Contract test manual verificado contra sandbox (`npm run test:contract:yuno`) usando el cliente HTTP propio. El worker todavía no ejecuta escrituras dentro de una campaña. |
+| Yuno | Contract test manual verificado contra sandbox (`npm run test:contract:yuno`) usando el cliente HTTP propio, más `npm run test:contract:execution-worker` para el ejecutor completo (create/update/verify/delete). El worker todavía no ejecuta escrituras dentro de una campaña real: falta el planificador comercial que decida qué operaciones encolar. |
 
 Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durable (`83de4c5`) y catálogo (`248749f`, `a2f010f`, `ea52811`).
 
@@ -158,17 +158,17 @@ La DB representa el baseline aceptado de sandbox y producción.
 
 - [x] `ExecutionPlan` inmutable: operaciones secuenciadas, hash canónico que cubre baseline/configuración/payloads, precondiciones básicas y `DELETE` al final. `enqueueSandboxExecutionPlan` lo persiste como `ExecutionRun` + operaciones, aplica lock por alcance e idempotencia y audita el encolado. Aún no se expone como comando HTTP hasta conectar el planificador comercial server-side.
   - `POST /api/planning/campaigns/:id/sandbox-verification` ya genera server-side un plan `VERIFY` a partir de la versión actual de la campaña y el baseline sandbox (planes activos/futuros), sin recibir operaciones ni payloads de Yuno desde el cliente.
-- [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa `VERIFY` secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Cada `VERIFY` compara ID, `updated_at` y hash de la respuesta completa contra el baseline inmutable; un drift confirmado detiene la ejecución, queda registrado y exige reconciliación antes de permitir otro run para ese alcance. Escrituras siguen bloqueadas hasta completar planificador y compensaciones.
+- [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa las operaciones secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Cada `VERIFY` compara ID, `updated_at` y hash de la respuesta completa contra el baseline inmutable; un drift confirmado detiene la ejecución, queda registrado y exige reconciliación antes de permitir otro run para ese alcance.
 - [x] polling, claim atómico, lease y heartbeat.
-- create/update/delete/verify.
+- [x] create/update/delete/verify: `executeClaimedSandboxRun` (`execution-worker.ts`) ejecuta los cuatro tipos contra sandbox. `CREATE` registra el `RemotePlan` resultante (`origin: TOOL`); `UPDATE` siempre relee con `retrieve` tras el `PATCH` (su respuesta inmediata no es confiable, `13_OPEN_DECISIONS.md` §6) y compara contra lo enviado; `DELETE` trata un `isNotFound()` como anomalía a reconciliar, nunca como éxito silencioso. **Limitación deliberada:** una operación no puede referenciar el plan que un `CREATE` anterior del mismo run creó — encadenar create→update/delete/verify sobre el plan recién creado queda para cuando exista el planificador comercial. Sin exponerse todavía como comando HTTP (ver el punto anterior).
 - [x] locks e idempotencia local al encolar un `ExecutionPlan` sandbox.
-- compensaciones.
+- [x] compensaciones: `buildCompensationOperation` (`domain/execution-compensation.ts`) traduce cada tipo confirmado a su reverso (`CREATE`→borrar lo nuevo, `UPDATE`→restaurar el snapshot previo, `DELETE`→recrear desde el snapshot previo, `07_YUNO_EXECUTION.md` §6); el worker las ejecuta en orden inverso, una por vez, y se detiene ante la primera que no se confirme. Un run termina `ROLLED_BACK` si toda la compensación se confirma, o `RECONCILIATION_REQUIRED` si alguna falla o queda incierta. Solo se dispara ante un fallo **confirmado** de la operación en curso — nunca ante un resultado desconocido, para no compensar a ciegas.
 - [x] pantalla de progreso: la campaña permite encolar una verificación sandbox y muestra el `ExecutionRun`/operaciones con polling cada 3 segundos; la API de detalle es de solo lectura para los tres roles.
-- inyección de fallos.
+- [x] inyección de fallos: `execution-worker.integration.ts` (6 escenarios contra la Postgres de pruebas con un cliente Yuno falso, `fake-yuno-client.ts`) cubre camino feliz, compensación exitosa, compensación que también falla, resultado desconocido en la primera operación y a mitad de secuencia, y compensación de un `CREATE` del mismo run. Deliberadamente no se inyectan fallos contra el sandbox real de Yuno — no se puede forzar de forma determinística un fallo confirmado o un timeout contra un servidor real. El camino feliz contra Yuno real sí se verifica, en `execution-worker.contract.ts` (manual, `npm run test:contract:execution-worker`).
 
 ### Salida
 
-Una campaña se aplica y revierte con seguridad en sandbox.
+Una campaña se aplica y revierte con seguridad en sandbox. Pendiente para cerrar la fase por completo: exponer el ejecutor como comando HTTP una vez exista el planificador comercial server-side, y la limitación de encadenamiento entre operaciones de un mismo run documentada arriba.
 
 ## Fase 7: Laboratorio SDK
 
