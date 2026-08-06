@@ -157,8 +157,8 @@ La DB representa el baseline aceptado de sandbox y producción.
 ## Fase 6: Ejecutor sandbox
 
 - ExecutionPlan.
-- worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL.
-- polling, claim atómico, lease y heartbeat.
+- [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa `VERIFY` secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Escrituras siguen bloqueadas hasta completar planificador y compensaciones.
+- [x] polling, claim atómico, lease y heartbeat.
 - create/update/delete/verify.
 - locks e idempotencia local.
 - compensaciones.
