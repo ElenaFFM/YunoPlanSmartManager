@@ -10,11 +10,11 @@ El repositorio está en desarrollo. La documentación funcional y técnica vive 
 - Queue PostgreSQL con claim/lease durable; el worker todavía no escribe en Yuno.
 - Catálogo completo (Fase 2): bancos, BIN/IIN, plantillas `GENERAL`/`BANK`/`AMEX` con versionado inmutable, y tarjetas de prueba — con altas, edición, desactivación/archivo y API.
 - Interfaz mínima de catálogo (`/catalog/bancos`, `/catalog/plantillas`, `/catalog/tarjetas`, `/catalog/auditoria`) para probar todo lo anterior con el usuario de desarrollo.
-- Auditoría: cada alta/edición/desactivación del catálogo queda registrada como `AuditEvent` en la misma transacción, visible en `/catalog/auditoria`.
+- Motor de dominio de campañas (Fase 3) completo: validación, versionado, prioridad Amex/banco/General, diff antes/durante/después y generación de casos SDK, expuesto en `/api/planning/campaigns` y con UI en `/planning/campanas` (alta, edición versionada, cambios cosméticos vs. materiales).
+- Auditoría: cada alta/edición/desactivación del catálogo y de campañas queda registrada como `AuditEvent` en la misma transacción, visible en `/catalog/auditoria`.
 - CI en GitHub Actions (lint, typecheck, tests y build en cada push/PR a `main`).
-- Migración del catálogo aplicada en la PostgreSQL de pruebas; integración de catálogo y de queue verificadas.
-- 17 pruebas unitarias, lint, typecheck y build verificados.
-- Autenticación productiva e integración con Yuno pendientes (Fase 0/1/3 en adelante).
+- Migración del catálogo aplicada en la PostgreSQL de pruebas; integración de catálogo, campañas, catálogo de alcances y de queue verificadas.
+- Autenticación productiva e integración de escritura con Yuno pendientes (Fase 0/1/6 en adelante).
 
 ## Requisitos
 

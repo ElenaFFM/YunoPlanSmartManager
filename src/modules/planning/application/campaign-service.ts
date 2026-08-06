@@ -372,6 +372,13 @@ async function assertNoActiveExecution(campaignId: string) {
   }
 }
 
+export async function listCampaigns() {
+  return prisma.campaign.findMany({
+    include: { currentVersion: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getCampaign(campaignId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },

@@ -37,7 +37,8 @@ const targetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("BANK"), bankId: z.string().min(1) }),
 ]);
 
-const segmentSchema = z.object({
+/** Exportado: también valida el body de un request HTTP de campaña, no solo un snapshot ya guardado. */
+export const campaignSegmentSchema = z.object({
   id: z.string().min(1),
   target: targetSchema,
   startAt: isoDateSchema,
@@ -54,7 +55,7 @@ const segmentSchema = z.object({
 });
 
 const snapshotSchema = z.object({
-  segments: z.array(segmentSchema).min(1),
+  segments: z.array(campaignSegmentSchema).min(1),
 });
 
 export class InvalidCampaignSnapshotError extends Error {

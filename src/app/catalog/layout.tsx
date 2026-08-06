@@ -13,6 +13,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
           <Link href="/catalog/plantillas">Plantillas</Link>
           <Link href="/catalog/tarjetas">Tarjetas de prueba</Link>
           <Link href="/catalog/auditoria">Auditoría</Link>
+          <Link href="/planning/campanas">→ Campañas</Link>
         </nav>
         <IdentityBadge />
         {children}

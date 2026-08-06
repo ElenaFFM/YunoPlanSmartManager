@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { AuthorizationError } from "@/modules/identity/application/authorize-request";
 import { CampaignInputError } from "../application/campaign-service";
-import { InvalidCampaignSnapshotError } from "../application/campaign-snapshot";
+import { campaignSegmentSchema, InvalidCampaignSnapshotError } from "../application/campaign-snapshot";
 import {
   InconsistentScopeCatalogError,
   OverlappingCampaignsError,
@@ -25,6 +25,14 @@ export const effectiveConfigurationQuerySchema = z.object({
     .enum(["true", "false"])
     .transform((value) => value === "true")
     .optional(),
+});
+
+/** Body de POST/PATCH de campaña: misma forma para crear y para editar la configuración. */
+export const campaignConfigurationSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  changeReason: z.string().min(1).max(500),
+  segments: z.array(campaignSegmentSchema).min(1),
 });
 
 export function planningErrorResponse(error: unknown) {
