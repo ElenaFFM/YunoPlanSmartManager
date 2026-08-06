@@ -77,6 +77,21 @@ La prueba de integración de la queue usa la PostgreSQL configurada, crea datos 
 ```powershell
 npm.cmd run test:integration:queue
 npm.cmd run test:integration:catalog
+npm.cmd run test:integration:campaign
+npm.cmd run test:integration:scope-catalog
+```
+
+`test:integration:scope-catalog` construye el catálogo de alcances completo, que es global por
+naturaleza (una sola configuración General y una sola Amex activas). Para trabajar sobre un catálogo
+controlado desactiva temporalmente las plantillas `GENERAL`/`AMEX` preexistentes y **las restaura
+siempre** al finalizar.
+
+El contract test contra el sandbox de Yuno es manual y requiere credenciales sandbox en `.env`
+(`YUNO_PUBLIC_API_KEY`, `YUNO_PRIVATE_SECRET_KEY`, `YUNO_CONTRACT_TEST_ACCOUNT_ID`). Crea un plan
+`[TEST]`, lo verifica y lo elimina al finalizar:
+
+```powershell
+npm.cmd run test:contract:yuno
 ```
 
 ## Base de datos

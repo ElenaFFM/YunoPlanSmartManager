@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 5 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1 agregados)
+**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 con el motor de dominio, campañas versionadas en base y lectura de la configuración efectiva desde el catálogo real)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -14,9 +14,10 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 | Persistencia | Prisma configurado; migración inicial y del catálogo aplicadas en la PostgreSQL de pruebas. |
 | Worker | Proceso Node.js separado, queue PostgreSQL y claim/lease implementados. Todavía no ejecuta operaciones contra Yuno. |
 | Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
-| Auditoría | Todas las mutaciones del catálogo generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de campañas/ejecuciones pendiente de que existan. |
+| Auditoría | Todas las mutaciones del catálogo y de campañas generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de ejecuciones pendiente de que existan. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
-| Yuno | Sin escrituras ni contract tests todavía. |
+| Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico e invalidación por versión. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). Falta la API/UI de campañas. |
+| Yuno | Contract test manual verificado contra sandbox (`npm run test:contract:yuno`) usando el cliente HTTP propio. El worker todavía no ejecuta escrituras dentro de una campaña. |
 
 Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durable (`83de4c5`) y catálogo (`248749f`, `a2f010f`, `ea52811`).
 
@@ -32,8 +33,8 @@ Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durabl
 
 - [x] Proyecto Next.js mínimo desde cero.
 - [x] Toolchain, lint, typecheck, tests y build.
-- [ ] Spike server-side contra sandbox.
-- [ ] Contract tests para los cinco endpoints.
+- [x] Spike server-side contra sandbox (create/retrieve/update/delete de installment plans, ver hallazgos en `13_OPEN_DECISIONS.md` §6). Falta cubrir `retrieveAll` con filtros (`currency`, `iin`, `amount`).
+- [x] Contract test automatizado para los cinco endpoints: `src/modules/executions/infrastructure/yuno-client.ts` (cliente HTTP) + `yuno-installments.contract.ts` (`npm run test:contract:yuno`, manual, no corre en CI). Pendiente cargar `YUNO_PUBLIC_API_KEY`/`YUNO_PRIVATE_SECRET_KEY`/`YUNO_CONTRACT_TEST_ACCOUNT_ID` de sandbox en `.env` para poder ejecutarlo — sin esas credenciales el script falla con un mensaje explícito en vez de silenciarse.
 - [ ] Pruebas de prioridad, fechas, `get all` futuro y expiración.
 - [ ] ADRs pendientes de identidad, SDK y calendario. La topología Render/Railway ya está documentada.
 - [ ] Prueba de latencia y estabilidad desde Render hacia Railway PostgreSQL.
@@ -84,18 +85,36 @@ Puede representarse la configuración comercial sin llamar a Yuno.
 
 ## Fase 3: Motor de dominio
 
-- Campaign/CampaignVersion.
-- transformaciones de cuotas.
-- proyección temporal y segmentación.
-- prioridades.
-- validaciones.
-- diff before/during/after.
-- generación de casos SDK.
-- property-based tests.
+- [x] Campaign/CampaignVersion — lógica de dominio (`src/modules/planning/domain/campaign.ts`): `CampaignConfiguration` da forma a lo que hoy es un `Json` opaco en `CampaignVersion.configurationSnapshot`; `validateCampaignConfiguration` cubre `CMP-001` a `CMP-007` devolviendo hallazgos con severidad (`validation.ts`, tipo compartido con `hasBlockingErrors`, reutilizable después para `EXEC-xxx` y el gate de producción); `computeCampaignMaterialHash` + `classifyCampaignChange` implementan §10 / `CMP-011` distinguiendo cambio `MATERIAL` (obliga a nueva versión y revoca aprobaciones) de `COSMETIC` (no invalida nada); `buildTemporalRules` traduce la campaña a las reglas que consume `projectInstallmentTimeline`, verificado de punta a punta contra UC-01 (campaña → reglas → proyección → diff).
+  - El hash material excluye deliberadamente `name`, `description`, `changeReason`, el `id` interno del segmento y `indefiniteConfirmed`: ninguno altera el payload remoto, así que renombrar o confirmar una vigencia indefinida no debe invalidar una aprobación válida. Es estable al orden de los segmentos y a fechas equivalentes expresadas en distinta zona horaria.
+  - Amex reutiliza `CMP-005` para el chequeo de superposición porque el catálogo no define un código propio para ese alcance.
+  - Pendiente de este ítem: `CMP-008`/`CMP-009` (baseline anterior y posterior proyectados) y `CMP-012` (patrón histórico), que dependen de datos que el dominio todavía no recibe. `CMP-010` ya está garantizado por construcción en `installments.ts`, que nunca inventa cuotas intermedias.
+- [x] Persistencia de campañas versionadas (`src/modules/planning/application/campaign-service.ts`): `createCampaign` guarda `Campaign` + `CampaignVersion` 1 con `canonicalHash` y `configurationSnapshot`; `updateCampaignConfiguration` aplica §10 contra la base según la clasificación del cambio — `UNCHANGED` no escribe, `COSMETIC` actualiza `Campaign.name`/`description` sin crear versión ni revocar aprobaciones, y `MATERIAL` crea versión nueva `DRAFT`, marca la anterior `SUPERSEDED` con `supersededAt` y revoca las `Approval` vigentes de la campaña. Todo transaccional, con `AuditEvent` en la misma transacción, siguiendo el patrón de `catalog-service.ts`.
+  - `campaign-snapshot.ts` es la frontera JSON ↔ dominio: serializa fechas a ISO y al leer valida con zod, así un snapshot corrupto no entra al motor como `Invalid Date`.
+  - Guarda `CMP-RUN-001`: un cambio material se bloquea si la campaña tiene un `ExecutionRun` en `QUEUED`/`RUNNING` (rompería EXEC-005). Un cambio cosmético sí se permite durante una ejecución.
+  - Lo inmutable de `CampaignVersion` es el snapshot de configuración y su hash; `changeReason` se trata como metadato editable, por eso corregirlo es `COSMETIC` y no crea versión.
+  - Verificado con `npm run test:integration:campaign` contra la PostgreSQL de pruebas (alta, cosmético, sin cambios, material con revocación de aprobación, guarda de ejecución en curso y rechazo de configuración inválida), con limpieza de sus datos al finalizar.
+  - **No implementable todavía:** "las pruebas anteriores quedan inválidas" de §10 requiere el modelo `TestRun`, que no existe en el schema (corresponde a Fase 7).
+- [x] Transformaciones de cuotas completas: `ADD_EXACT_INSTALLMENTS`, `CAP_MAX_INSTALLMENT`, `SET_EXACT_INSTALLMENTS`, `RESTORE_BASELINE` y su dispatcher (`src/modules/planning/domain/installments.ts`).
+- [x] Proyección temporal básica: `projectInstallmentTimeline` (`src/modules/planning/domain/timeline.ts`) construye segmentos contiguos sin solapamiento a partir de un baseline y reglas con vigencia, verificado contra UC-01/03/04/05.
+- [x] Segmentación multi-banco y prioridad entre scopes: `resolveEffectiveConfiguration` (`src/modules/planning/domain/effective-configuration.ts`) resuelve Amex > banco > General por BIN + monto + instante, reusando `projectInstallmentTimeline` por tramo. "Días específicos" no se modeló como scope aparte: es un `TemporalRule` normal de ventana acotada dentro del scope al que pertenece (decisión documentada en el propio módulo/plan), verificado con un test dedicado.
+- [x] Validaciones cruzadas: `validateScopeCatalog` (`src/modules/planning/domain/catalog-validation.ts`) rechaza un BIN asignado a más de un scope (Amex/banco) y rangos de monto superpuestos dentro de un mismo scope. Reusa el parser de montos compartido (`src/modules/planning/domain/amount.ts`, extraído de `effective-configuration.ts` para no duplicarlo).
+- [x] Construcción real de `ScopeCatalog` desde Prisma (`src/modules/planning/application/scope-catalog-builder.ts`): `buildScopeCatalog` combina el baseline de cada tramo de la plantilla activa con las reglas temporales de las campañas (`buildTemporalRules`), y `resolveEffectiveConfigurationFor` responde qué cuotas aplican a un BIN, monto y fecha. Expuesto en `GET /api/planning/effective-configuration` (lectura para los tres roles), verificado de punta a punta contra la base de pruebas y contra el dev server.
+  - **Decisión — BINs de Amex:** se relajó `validateTemplateBankAssociation` para que una plantilla `AMEX` pueda apuntar a un banco (antes solo `BANK` podía). De ese banco salen sus BIN/IIN, usando el `TemplateVersion.bankId` que ya existía: sin migración ni convenciones de código mágicas. Ese banco se excluye de los alcances bancarios, porque sus BIN pertenecen a Amex, que tiene prioridad superior.
+  - **Decisión — qué campañas proyecta:** por defecto solo versiones `VALIDATED`, con `includeDrafts` para previsualizar borradores. Nota: todavía nada transiciona a `VALIDATED`, así que por defecto ninguna campaña aplica hasta que exista ese flujo; el test cubre ambos modos.
+  - Inconsistencias explícitas con `CAT-SCOPE-001` en vez de elegir en silencio: dos plantillas activas del mismo alcance, o ninguna plantilla `GENERAL` activa. Un banco sin plantilla propia no forma alcance: sus BIN caen a General, que es el comportamiento correcto del dominio.
+  - `template-snapshot.ts` valida con zod el `configurationSnapshot` de plantillas al leerlo, igual que `campaign-snapshot.ts` para campañas.
+- [ ] Detección de superposición **entre campañas distintas** sobre el mismo alcance: `validateCampaignConfiguration` cubre `CMP-005`/`CMP-006` dentro de una campaña, pero dos campañas que se pisen entre sí no se detectan todavía.
+- [x] Diff before/during/after a nivel de un scope/tramo: `diffInstallmentSets` y `diffTimelineSegments` (`src/modules/planning/domain/installment-diff.ts`), verificado sobre los escenarios reales de UC-01 (baja de 24 a 18) y UC-03 (agregar 18 con retorno exacto al baseline). Pendiente: un diff agregado que combine varios scopes/tramos de una campaña completa a la vez — esta pieza opera sobre una sola línea de tiempo por vez, igual que `projectInstallmentTimeline`.
+- [ ] Generación de casos SDK (monto interior/mínimo/máximo/adyacente por tramo).
+- [ ] Property-based tests con librería dedicada (por ahora los invariantes de contigüidad se prueban con casos concretos, sin agregar dependencias nuevas).
+- [x] Hash canónico reutilizable (`computeCanonicalHash`, `src/modules/planning/domain/canonical-hash.ts`) para `CampaignVersion.canonicalHash`.
 
 ### Salida
 
-UC-01 a UC-05 calculados de forma determinista con tests.
+**Alcanzada para el cálculo y la lectura.** UC-01 a UC-05 se calculan de forma determinista con tests, incluyendo prioridad entre Amex/banco/General (`effective-configuration.test.ts`), diff antes/durante/después (`installment-diff.test.ts`), validaciones cruzadas de unicidad (`catalog-validation.test.ts`) y la campaña como concepto de dominio con validación, hash e invalidación por versión (`campaign.test.ts`). Todo eso está conectado a la base y verificado ahí: escritura versionada (`campaign.integration.ts`) y lectura del catálogo real respondiendo qué cuotas aplican a un BIN, monto y fecha (`scope-catalog.integration.ts` + `GET /api/planning/effective-configuration`), que es la métrica del §6 de `01_PRODUCT_SCOPE.md`.
+
+Falta para cerrar la fase: API HTTP y UI de campañas, detección de superposición entre campañas distintas, y generación de casos SDK (fuera de alcance por ahora).
 
 ## Fase 4: UX de planificación
 
