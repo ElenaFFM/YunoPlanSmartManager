@@ -18,6 +18,7 @@ import {
   enqueueSandboxVerification,
   enqueueSandboxDeployment,
   getExecutionRunProgress,
+  validateCampaign,
   type ExecutionRunProgress,
 } from "../planning-client";
 import { CampaignImpact, CampaignTimeline, CampaignVersionHistory } from "../campaign-insights";
@@ -235,6 +236,7 @@ export default function CampanasPage() {
             canWrite={canWrite}
             disabled={busy}
             onSubmit={(input) => run(() => updateCampaign(userId, campaign.id, input))}
+            onValidate={() => run(() => validateCampaign(userId, campaign.id).then((result) => ({ findings: result.findings })))}
             userId={userId}
             isAdmin={identity.status === "ready" && identity.identity.role === "ADMIN"}
           />
@@ -251,6 +253,7 @@ function CampaignCard({
   canWrite,
   disabled,
   onSubmit,
+  onValidate,
   userId,
   isAdmin,
 }: {
@@ -259,6 +262,7 @@ function CampaignCard({
   canWrite: boolean;
   disabled: boolean;
   onSubmit: (input: CampaignConfigurationInput) => void;
+  onValidate: () => void;
   userId: string;
   isAdmin: boolean;
 }) {
@@ -294,6 +298,12 @@ function CampaignCard({
       <CampaignVersionHistory campaign={campaign} />
       {isAdmin && <CampaignVerification campaignId={campaign.id} userId={userId} />}
       {isAdmin && <CampaignDeployment campaignId={campaign.id} userId={userId} />}
+
+      {canWrite && version?.status === "DRAFT" && (
+        <button className="secondary" disabled={disabled} onClick={onValidate}>
+          Validar campaña
+        </button>
+      )}
 
       {canWrite && (
         <>

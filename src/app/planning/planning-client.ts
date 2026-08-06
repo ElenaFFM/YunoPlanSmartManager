@@ -169,6 +169,18 @@ export function updateCampaign(userId: string, campaignId: string, input: Campai
   });
 }
 
+export type ValidateCampaignResult = {
+  campaign: Campaign;
+  findings: ValidationFinding[];
+};
+
+/** Pasa la versión actual de DRAFT a VALIDATED. No es el gate de producción (eso es Fase 7/8). */
+export function validateCampaign(userId: string, campaignId: string) {
+  return apiFetch<ValidateCampaignResult>(userId, `/api/planning/campaigns/${campaignId}/validate`, {
+    method: "POST",
+  });
+}
+
 export function enqueueSandboxVerification(userId: string, campaignId: string, idempotencyKey: string) {
   return apiFetch<ExecutionRunProgress>(userId, `/api/planning/campaigns/${campaignId}/sandbox-verification`, { method: "POST", body: JSON.stringify({ idempotencyKey }) });
 }

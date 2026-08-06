@@ -6,8 +6,10 @@ import {
   createCampaign,
   getCampaign,
   updateCampaignConfiguration,
+  validateCampaignVersion,
 } from "../application/campaign-service";
 import { parseCampaignSegments } from "../application/campaign-snapshot";
+import { OverlappingCampaignsError } from "../application/scope-catalog-builder";
 import type { CampaignSegment } from "../domain/campaign";
 
 const testId = `campaign-${Date.now()}`;
@@ -18,6 +20,8 @@ let deploymentId: string | undefined;
 let realBankId: string | undefined;
 let realBankTemplateId: string | undefined;
 let outOfBoundsCampaignId: string | undefined;
+let warningCampaignId: string | undefined;
+let overlapCampaignId: string | undefined;
 
 const baseSegments: readonly CampaignSegment[] = [
   {
@@ -267,10 +271,82 @@ try {
   outOfBoundsCampaignId = validRangeCampaign.campaign.id;
   assert.deepEqual(validRangeCampaign.findings, []);
 
+  // 9. Validar: pasa DRAFT -> VALIDATED, y una segunda validación se rechaza
+  // porque ya no está en DRAFT (CMP-VALIDATE-001).
+  const validated = await validateCampaignVersion({
+    campaignId: outOfBoundsCampaignId,
+    actorId: user.id,
+  });
+  assert.equal(validated.campaign.currentVersion?.status, "VALIDATED");
+
+  await assert.rejects(
+    validateCampaignVersion({ campaignId: outOfBoundsCampaignId, actorId: user.id }),
+    (error) => error instanceof CampaignInputError && error.code === "CMP-VALIDATE-001",
+  );
+
+  // 10. Validar es más estricto que guardar: una advertencia sin resolver
+  // (CMP-013, transformación que no cambia nada contra el baseline real)
+  // bloquea la validación aunque no bloqueara el alta.
+  const warningCampaign = await createCampaign({
+    name: `Advertencia sin resolver ${testId}`,
+    changeReason: "Cuota tope por encima del baseline, no cambia nada",
+    segments: [
+      {
+        id: "seg-warning",
+        target: { type: "BANK", bankId: realBankId },
+        startAt: new Date("2026-10-01T00:00:00-03:00"),
+        endAt: null,
+        indefiniteConfirmed: true,
+        rangeChanges: [
+          { rangeIndex: 1, transformation: { type: "CAP_MAX_INSTALLMENT", maximum: 24 } },
+        ],
+      },
+    ],
+    createdById: user.id,
+  });
+  warningCampaignId = warningCampaign.campaign.id;
+  assert.ok(
+    warningCampaign.findings.some((finding) => finding.code === "CMP-013"),
+    "el alta debe advertir, no bloquear, una transformación sin efecto",
+  );
+
+  await assert.rejects(
+    validateCampaignVersion({ campaignId: warningCampaignId, actorId: user.id }),
+    (error) => error instanceof CampaignInputError && error.code === "CMP-013",
+  );
+
+  // 11. Validar rechaza el solapamiento con otra campaña ya VALIDATED sobre el
+  // mismo alcance/tramo, aunque cada una por separado sea válida.
+  const overlapCampaign = await createCampaign({
+    name: `Solapa con validada ${testId}`,
+    changeReason: "Debe chocar con la campaña ya validada en el tramo 4",
+    segments: [
+      {
+        id: "seg-overlap",
+        target: { type: "BANK", bankId: realBankId },
+        startAt: new Date("2026-09-15T00:00:00-03:00"),
+        endAt: null,
+        indefiniteConfirmed: true,
+        rangeChanges: [
+          { rangeIndex: 4, transformation: { type: "CAP_MAX_INSTALLMENT", maximum: 6 } },
+        ],
+      },
+    ],
+    createdById: user.id,
+  });
+  overlapCampaignId = overlapCampaign.campaign.id;
+  assert.deepEqual(overlapCampaign.findings, []);
+
+  await assert.rejects(
+    validateCampaignVersion({ campaignId: overlapCampaignId, actorId: user.id }),
+    (error) => error instanceof OverlappingCampaignsError && error.code === "CMP-005",
+  );
+
   const auditEvents = await prisma.auditEvent.findMany({ where: { actorId: user.id } });
   assert.ok(auditEvents.some((event) => event.action === "campaign.create"));
   assert.ok(auditEvents.some((event) => event.action === "campaign.update.cosmetic"));
   assert.ok(auditEvents.some((event) => event.action === "campaign.version.create"));
+  assert.ok(auditEvents.some((event) => event.action === "campaign.version.validate"));
 
   console.log("Campaign integration test passed.");
 } finally {
@@ -285,7 +361,7 @@ try {
     await prisma.executionRun.deleteMany({ where: { deploymentId } });
     await prisma.deployment.deleteMany({ where: { id: deploymentId } });
   }
-  for (const id of [campaignId, outOfBoundsCampaignId]) {
+  for (const id of [campaignId, outOfBoundsCampaignId, warningCampaignId, overlapCampaignId]) {
     if (!id) continue;
     await prisma.campaign.updateMany({ where: { id }, data: { currentVersionId: null } });
     await prisma.campaignVersion.deleteMany({ where: { campaignId: id } });
