@@ -157,6 +157,7 @@ La DB representa el baseline aceptado de sandbox y producción.
 ## Fase 6: Ejecutor sandbox
 
 - [x] `ExecutionPlan` inmutable: operaciones secuenciadas, hash canónico que cubre baseline/configuración/payloads, precondiciones básicas y `DELETE` al final. `enqueueSandboxExecutionPlan` lo persiste como `ExecutionRun` + operaciones, aplica lock por alcance e idempotencia y audita el encolado. Aún no se expone como comando HTTP hasta conectar el planificador comercial server-side.
+  - `POST /api/planning/campaigns/:id/sandbox-verification` ya genera server-side un plan `VERIFY` a partir de la versión actual de la campaña y el baseline sandbox (planes activos/futuros), sin recibir operaciones ni payloads de Yuno desde el cliente.
 - [x] worker durable usando `ExecutionRun`/`ExecutionOperation` como queue PostgreSQL: reclama en forma atómica, renueva lease y procesa `VERIFY` secuencialmente contra sandbox, persistiendo `SENT` antes de llamar a Yuno. Escrituras siguen bloqueadas hasta completar planificador y compensaciones.
 - [x] polling, claim atómico, lease y heartbeat.
 - create/update/delete/verify.

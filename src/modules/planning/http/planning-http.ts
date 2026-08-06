@@ -15,6 +15,8 @@ import {
 } from "@/modules/executions/application/remote-plan-snapshot";
 import { RemotePlanImportError } from "@/modules/executions/application/remote-plan-import";
 import { RemotePlanReconciliationError } from "@/modules/executions/application/remote-plan-reconciliation";
+import { ExecutionPlanQueueError } from "@/modules/executions/application/execution-plan-service";
+import { SandboxVerificationPlanError } from "@/modules/executions/application/sandbox-verification-plan";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 
 export const effectiveConfigurationQuerySchema = z.object({
@@ -51,6 +53,10 @@ export const updateRemotePlanClassificationSchema = z.object({
   segmentKey: z.string().trim().min(1).max(200).nullable().optional(),
   equivalentLogicalKey: z.string().trim().min(1).max(200).nullable().optional(),
   note: z.string().trim().min(1).max(1_000).optional(),
+});
+
+export const executionPlanRequestSchema = z.object({
+  idempotencyKey: z.string().trim().min(8).max(200),
 });
 
 export function planningErrorResponse(error: unknown) {
@@ -126,6 +132,13 @@ export function planningErrorResponse(error: unknown) {
   }
 
   if (error instanceof RemotePlanReconciliationError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: error.status },
+    );
+  }
+
+  if (error instanceof ExecutionPlanQueueError || error instanceof SandboxVerificationPlanError) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },
