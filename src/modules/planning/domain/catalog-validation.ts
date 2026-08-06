@@ -2,9 +2,12 @@ import { parseAmountToCents, rangesOverlap } from "./amount.ts";
 import type { ScopeCatalog, ScopedRangeTimeline } from "./effective-configuration.ts";
 
 export class InvalidScopeCatalogError extends Error {
-  constructor(message: string) {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
     super(message);
     this.name = "InvalidScopeCatalogError";
+    this.code = code;
   }
 }
 
@@ -18,6 +21,7 @@ function checkRangesDoNotOverlap(scopeLabel: string, ranges: readonly ScopedRang
     for (let j = i + 1; j < centsRanges.length; j += 1) {
       if (rangesOverlap(centsRanges[i], centsRanges[j])) {
         throw new InvalidScopeCatalogError(
+          "TPL-003",
           `${scopeLabel}: los tramos ${i} y ${j} tienen montos superpuestos.`,
         );
       }
@@ -43,6 +47,7 @@ export function validateScopeCatalog(catalog: ScopeCatalog): void {
       const owner = binOwners.get(bin);
       if (owner) {
         throw new InvalidScopeCatalogError(
+          "CAT-IIN-002",
           `El BIN "${bin}" está asignado tanto a ${owner} como a BANK:${bank.bankId}.`,
         );
       }

@@ -5,6 +5,7 @@ import { CampaignInputError } from "../application/campaign-service";
 import { InvalidCampaignSnapshotError } from "../application/campaign-snapshot";
 import { InconsistentScopeCatalogError } from "../application/scope-catalog-builder";
 import { InvalidTemplateSnapshotError } from "../application/template-snapshot";
+import { InvalidScopeCatalogError } from "../domain/catalog-validation";
 import { NoMatchingRangeError } from "../domain/effective-configuration";
 
 export const effectiveConfigurationQuerySchema = z.object({
@@ -55,6 +56,15 @@ export function planningErrorResponse(error: unknown) {
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },
+    );
+  }
+
+  // Un catálogo con BIN duplicado o tramos superpuestos es un estado de datos
+  // inconsistente, no un problema de la solicitud.
+  if (error instanceof InvalidScopeCatalogError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message } },
+      { status: 409 },
     );
   }
 

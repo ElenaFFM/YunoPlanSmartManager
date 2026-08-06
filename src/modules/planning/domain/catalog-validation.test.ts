@@ -36,7 +36,10 @@ describe("validateScopeCatalog", () => {
       ],
     };
 
-    assert.throws(() => validateScopeCatalog(conflicting), InvalidScopeCatalogError);
+    assert.throws(
+      () => validateScopeCatalog(conflicting),
+      (error: unknown) => error instanceof InvalidScopeCatalogError && error.code === "CAT-IIN-002",
+    );
   });
 
   it("rechaza un BIN compartido entre Amex y un banco", () => {
@@ -46,7 +49,10 @@ describe("validateScopeCatalog", () => {
       banks: [{ ...catalog.banks[0], bins: ["371693"] }],
     };
 
-    assert.throws(() => validateScopeCatalog(conflicting), InvalidScopeCatalogError);
+    assert.throws(
+      () => validateScopeCatalog(conflicting),
+      (error: unknown) => error instanceof InvalidScopeCatalogError && error.code === "CAT-IIN-002",
+    );
   });
 
   it("rechaza rangos de monto superpuestos dentro del mismo scope", () => {
@@ -62,7 +68,10 @@ describe("validateScopeCatalog", () => {
       },
     };
 
-    assert.throws(() => validateScopeCatalog(conflicting), InvalidScopeCatalogError);
+    assert.throws(
+      () => validateScopeCatalog(conflicting),
+      (error: unknown) => error instanceof InvalidScopeCatalogError && error.code === "TPL-003",
+    );
   });
 
   it("acepta rangos contiguos (sin superposición) dentro del mismo scope", () => {
