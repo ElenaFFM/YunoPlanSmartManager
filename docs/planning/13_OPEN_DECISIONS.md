@@ -6,8 +6,7 @@ Este documento evita convertir supuestos en implementación. Cada punto cerrado 
 
 ### Cobertura de rangos
 
-**Propuesta:** bancos y General mantienen cuatro tramos contiguos desde `$0` hasta `$99.999.999`, sin huecos ni cruces.  
-**Pendiente:** confirmar si un usuario `ADMIN` puede dejar intencionalmente un hueco.
+**Cerrada (2026-08-06):** un `ADMIN` no puede dejar huecos intencionales. Bancos y General mantienen cuatro tramos contiguos desde `$0` hasta `$99.999.999`, sin huecos ni cruces. Un catálogo parcialmente cubierto vuelve ambiguo el resultado para un monto y por eso es un error estructural, no una excepción comercial.
 
 ### Amex
 
@@ -16,12 +15,11 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Ediciones directas
 
-**Propuesta:** cambios estructurales usan reemplazo; PATCH solo para operaciones probadas como seguras.  
-**Pendiente:** lista exacta de campos permitidos por PATCH y cuándo se prefiere.
+**Cerrada (2026-08-06):** `PATCH` solo modifica atributos no ejecutables y cambios de estado controlados: nombre, descripción, estado del banco/plantilla, estado y vigencia de un BIN, y estado de una tarjeta de prueba. Todo cambio de rangos, BINs aplicables, cuotas, alcance, vigencia de campaña o configuración ejecutable crea una versión inmutable nueva; nunca altera un snapshot ya creado. Los endpoints de actualización deben expresar esa semántica y exigir motivo cuando generan versión.
 
 ### Vigencias comerciales
 
-**Pendiente:** definir metadatos de acuerdos (fecha de contrato, renovación, responsable) y alertas.
+**Cerrada (2026-08-06):** los acuerdos comerciales se modelarán como metadatos opcionales de banco/plantilla: `contractStartAt`, `contractEndAt`, `renewalNoticeDays` (default 60) y `businessOwnerUserId`. La ausencia de acuerdo no bloquea un borrador; una vigencia de campaña que supere el fin de contrato genera un warning justificable. Las alertas se emiten a 60, 30 y 7 días del vencimiento. La primera implementación puede mostrarlas en la UI/polling sin servicio externo de notificaciones.
 
 ## 2. Aprobaciones
 
@@ -31,11 +29,11 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Advertencias
 
-**Pendiente:** cuáles puede aceptar un `OPERATOR`, cuáles requieren `ADMIN` y cuáles son siempre error.
+**Cerrada (2026-08-06):** `OPERATOR` o `ADMIN` pueden aceptar, con motivo y auditoría, montos inusuales, combinaciones comerciales atípicas, vigencias indefinidas confirmadas y cambios de Amex. Solo `ADMIN` puede aceptar un delete manual con reemplazo no estándar o una campaña que exceda el acuerdo comercial. Huecos/cruces de rangos, BIN duplicado, falta de cuota 1, hash no aprobado, drift estructural, ambiente/credenciales inconsistentes y falta de IDs remotos son siempre errores no sobreescribibles.
 
 ### Emergencias
 
-**Pendiente:** procedimiento break-glass, responsables y restricciones para producción.
+**Cerrada (2026-08-06):** el procedimiento break-glass es exclusivamente para un `ADMIN` activo en producción y permite solicitar una operación manual de contención (delete o reemplazo identificado), nunca desactivar autorización, auditoría, confirmación reforzada, verificación posterior ni persistencia del resultado. Requiere motivo de incidente, referencia de ticket, tipeo del nombre de campaña y `PRODUCTION`, y registra el actor, la hora, los IDs afectados y la compensación prevista. El run queda marcado `EMERGENCY` en su auditoría y exige reconciliación posterior antes de habilitar otra ejecución sobre el mismo alcance. Los responsables se administran por el rol fijo `ADMIN`; la asignación nominada pertenece a la operación del entorno, no al código.
 
 ## 3. Sandbox y SDK
 
@@ -45,11 +43,11 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Captura automática
 
-**Pendiente:** confirmar si la integración SDK permite leer programáticamente las cuotas observadas o requiere confirmación manual.
+**Cerrada (2026-08-06):** el laboratorio funciona con captura manual confirmada como baseline. Cada caso persiste cuotas observadas, usuario, timestamp y evidencia opcional; la aprobación nunca depende de un checkbox global. La captura automática se agrega solo si el SDK expone un dato estable y verificable durante el spike de integración, y se compara contra la captura manual en los primeros ensayos.
 
 ### Transición comprimida
 
-**Pendiente:** duración estándar y si será obligatoria para ciertos tipos de campaña.
+**Cerrada (2026-08-06):** un ensayo de transición comprimida usa checkpoints de 5 minutos antes, 10 minutos durante y 5 minutos después, con un máximo de 30 minutos incluyendo preparación y cleanup. Es obligatorio cuando una campaña tiene más de una configuración temporal efectiva, modifica prioridades potencialmente superpuestas o incluye retorno a baseline; es opcional para una única configuración sin fecha de fin. Sus fechas siempre son de ensayo sandbox y no se copian a la versión canónica.
 
 ## 4. Arquitectura
 
@@ -57,7 +55,9 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 **Cerrada:** Next.js se desplegará como Render Web Service, el worker como Render Background Worker y PostgreSQL permanecerá en Railway.
 
-**Pendiente operativo:** confirmar la región de la base Railway. Si es posible, usar Railway US East y Render Virginia para reducir latencia.
+**Objetivo operativo:** Railway US East y Render Virginia para reducir latencia.
+
+**Cerrada como objetivo de despliegue (2026-08-06):** Railway `US East (Virginia)` y Render `Virginia`. Si una base existente no puede migrarse antes de staging, se mantiene su región solo de forma transitoria y se mide p95 de conexión y query antes de aprobar el entorno; producción no se habilita sin una medición registrada.
 
 ### Queue/workflow
 
@@ -65,7 +65,7 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Identidad
 
-**Pendiente:** proveedor, SSO, MFA, ciclo de alta/baja y recuperación.
+**Cerrada para integración (2026-08-06):** la aplicación se integra mediante OpenID Connect Authorization Code con PKCE y sesión server-side con cookie `httpOnly`/`secure`; no queda acoplada a un proveedor propietario. Staging y producción requieren issuer, client ID y secretos configurados por ambiente. Los usuarios se preaprovisionan en PostgreSQL por un `ADMIN`; el login solo vincula una identidad cuyo email verificado coincide con un usuario activo, sin alta JIT. `OPERATOR` y `ADMIN` requieren MFA exigido por el proveedor; al deshabilitar un usuario se revoca su acceso en la siguiente request y se rechazan sus comandos pendientes. Alta, baja y recuperación se realizan en el IdP corporativo y quedan auditadas en la aplicación cuando cambian el registro local. La elección y contratación del IdP es una tarea operativa, no un bloqueo de la interfaz de integración.
 
 ### Actualizaciones UI
 
@@ -73,28 +73,27 @@ Confirmado que sus cuotas no quedan bloqueadas.
 
 ### Calendario/Gantt
 
-**Pendiente:** librería o componente propio, considerando accesibilidad y licencia.
+**Cerrada (2026-08-06):** la primera versión será un componente propio, sin dependencia de calendario/Gantt. Tendrá vista tabular accesible como fuente principal, timeline mensual/semanal derivado de esos datos y filtros por alcance/estado. Drag-and-drop solo propone una versión nueva y nunca guarda ni ejecuta directamente. Se reconsiderará una librería únicamente si el componente propio no cubre navegación por teclado, lectura tabular o rendimiento con datos reales.
 
 ## 5. Datos y operación
 
 ### Importación inicial
 
-Los datos se suministrarán cuando sean necesarios.  
-**Pendiente:** formato, responsable de validación y fecha de corte.
+**Cerrada (2026-08-06):** la carga inicial usa un CSV versionado con un registro por plan remoto y columnas mínimas de ID Yuno, cuenta, ambiente, nombre, alcance inferido o `UNCLASSIFIED`, BIN/IIN, rango, cuotas, disponibilidad, timestamps y payload crudo normalizado. El archivo se valida en seco, se conserva con hash y fecha de corte UTC y recién después se importa. Un `ADMIN` valida el archivo y otro `OPERATOR` puede revisar el resumen; para MVP no se exige four-eyes. La fecha de corte es el instante UTC en que comienza la importación y se registra en el lote, no una fecha manual propensa a ambigüedad.
 
 ### Backups y retención
 
 **Cerrada:** PostgreSQL estará alojado en Railway.
 
-**Pendiente operativo:** definir retención de backups y auditoría, habilitar la política de PITR correspondiente y acordar frecuencia/responsable de las pruebas de restore.
+**Cerrada (2026-08-06):** producción requiere backups automáticos diarios con 35 días de retención y PITR habilitado si el plan de Railway lo soporta; si no, el despliegue productivo queda bloqueado. Se conserva la auditoría por al menos 365 días. Un `ADMIN` operativo ejecuta y documenta un restore de prueba antes del primer despliegue productivo y luego trimestralmente; el resultado incluye fecha, RPO/RTO observado y acciones correctivas.
 
 ### Exportación
 
-**Pendiente:** confirmar si se mantiene exportación XLSX/Drive además de PostgreSQL.
+**Cerrada (2026-08-06):** el MVP no integra Drive ni genera XLSX. La fuente de verdad es PostgreSQL y las consultas/auditorías se exportarán como CSV bajo autorización, con evento de auditoría. XLSX o Drive se reconsideran si una necesidad operativa concreta no puede satisfacerse con CSV.
 
 ### Decimales
 
-**Pendiente técnico:** precisión/escala exacta aceptada por Yuno y semántica inclusiva de min/max.
+**Cerrada para el dominio (2026-08-06):** los montos ARS usan escala máxima de dos decimales, se almacenan y comparan como centavos enteros, y los rangos son inclusivos en ambos extremos. El adapter Yuno serializa sin perder precisión y el contract test conserva casos de borde mínimo/máximo. Si Yuno demostrara una precisión distinta, será un cambio de contrato explícito con migración; no se redondea silenciosamente.
 
 ### Tarjetas de prueba (`TestCard`)
 
@@ -130,6 +129,8 @@ Los datos se suministrarán cuando sean necesarios.
 - límites de cantidad de planes/requests (rate limiting).
 - disponibilidad de idempotencia para installment plans (no hay campo de idempotency key en el schema de `create`; no se probó crear el mismo plan dos veces).
 
+**Decisión operativa mientras se verifica el contrato (2026-08-06):** la aplicación no crea planes remotos superpuestos dentro de un mismo alcance/rango/ventana; los casos que deban probar prioridad se limitan al laboratorio SDK. El worker ejecuta una operación remota por vez, respeta `Retry-After` si existe y aplica backoff acotado ante fallas transitorias. Como Yuno no expone idempotency key para estos planes, no reintenta un `CREATE` cuyo resultado sea incierto: lo marca para reconciliación mediante lectura antes de cualquier nueva escritura.
+
 ## 7. Registro de decisiones
 
 | ID | Tema | Estado | Decisión |
@@ -157,3 +158,14 @@ Los datos se suministrarán cuando sean necesarios.
 | D-021 | Desarrollo DB | Cerrada | PostgreSQL remota exclusiva de pruebas; sin PostgreSQL local obligatorio |
 | D-022 | Rangos Amex | Cerrada | Cantidad de tramos libre para el `ADMIN`; misma regla de cobertura contigua que bancos/General |
 | D-023 | Tarjetas de prueba | Cerrada | Número en texto plano; datos ficticios de sandbox, tratados como controlados en la UI/auditoría |
+| D-024 | Cobertura de rangos | Cerrada | Sin huecos intencionales; cobertura completa es un invariante estructural |
+| D-025 | Mutaciones directas | Cerrada | PATCH solo no ejecutable; cambios materiales crean versión inmutable |
+| D-026 | Vigencias comerciales | Cerrada | Metadatos de acuerdo y alertas 60/30/7 días |
+| D-027 | Overrides de warnings | Cerrada | Operador/Admin para warnings comerciales; Admin para excepciones sensibles; errores no se sobreescriben |
+| D-028 | Emergencias | Cerrada | Break-glass Admin, acotado, auditado y con reconciliación obligatoria |
+| D-029 | Laboratorio SDK | Cerrada | Captura manual baseline y transición comprimida de 5/10/5 minutos según riesgo |
+| D-030 | Identidad | Cerrada | OIDC configurable, usuarios preaprovisionados y MFA para operación productiva |
+| D-031 | Calendario/Gantt | Cerrada | Componente propio accesible y alternativa tabular; sin dependencia inicial |
+| D-032 | Importación inicial | Cerrada | CSV validado y hasheado, fecha de corte UTC y validación por rol |
+| D-033 | Backups y exportación | Cerrada | PITR + 35 días, restore trimestral y CSV auditado; sin Drive/XLSX en MVP |
+| D-034 | Montos y resiliencia Yuno | Cerrada | Centavos inclusivos, operaciones secuenciales, backoff y reconciliación ante resultado incierto |

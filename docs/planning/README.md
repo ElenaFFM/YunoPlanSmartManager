@@ -11,7 +11,7 @@ Este directorio organiza las decisiones, reglas, flujos, riesgos y etapas de imp
 
 La documentación debe mantenerse actualizada junto con el código. Una decisión que cambie el comportamiento del producto deberá modificar primero o en el mismo cambio el documento correspondiente.
 
-El avance ejecutado se mantiene en el [roadmap de implementación](12_IMPLEMENTATION_ROADMAP.md). Actualmente están listas las fundaciones principales, el claim/lease del worker y la primera iteración del catálogo. La migración del catálogo y su prueba de integración contra PostgreSQL siguen pendientes.
+El avance ejecutado se mantiene en el [roadmap de implementación](12_IMPLEMENTATION_ROADMAP.md). Están completas las fundaciones, el claim/lease del worker, el catálogo versionado con auditoría y el motor de campañas con API y UI básica. La Fase 4 ya incorporó calendario accesible, impacto lógico e historial de versiones; continúan pendientes el asistente guiado y el dashboard. Las decisiones que guían las fases siguientes se registran en [decisiones abiertas y cerradas](13_OPEN_DECISIONS.md).
 
 ## Documentos
 

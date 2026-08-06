@@ -29,13 +29,17 @@ export type CampaignVersion = {
   canonicalHash: string;
   changeReason: string;
   configurationSnapshot: { segments: CampaignSegmentJson[] };
+  createdAt: string;
+  supersededAt: string | null;
 };
 
 export type Campaign = {
   id: string;
   name: string;
   description: string | null;
+  createdAt: string;
   currentVersion: CampaignVersion | null;
+  versions: CampaignVersion[];
 };
 
 export type ValidationSeverity = "ERROR" | "WARNING" | "INFO";

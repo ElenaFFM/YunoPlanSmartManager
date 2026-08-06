@@ -374,7 +374,10 @@ async function assertNoActiveExecution(campaignId: string) {
 
 export async function listCampaigns() {
   return prisma.campaign.findMany({
-    include: { currentVersion: true },
+    include: {
+      currentVersion: true,
+      versions: { orderBy: { versionNumber: "desc" } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

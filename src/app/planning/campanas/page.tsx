@@ -16,6 +16,7 @@ import {
   type InstallmentTransformation,
   type ValidationFinding,
 } from "../planning-client";
+import { CampaignImpact, CampaignTimeline, CampaignVersionHistory } from "../campaign-insights";
 
 type DraftSegment = Omit<CampaignSegmentJson, "endAt"> & { endAt: string };
 
@@ -219,6 +220,8 @@ export default function CampanasPage() {
         />
       )}
 
+      <CampaignTimeline campaigns={campaigns} banks={banks} />
+
       <div className="grid">
         {campaigns.map((campaign) => (
           <CampaignCard
@@ -276,6 +279,9 @@ function CampaignCard({
           </li>
         ))}
       </ul>
+
+      <CampaignImpact campaign={campaign} banks={banks} />
+      <CampaignVersionHistory campaign={campaign} />
 
       {canWrite && (
         <>

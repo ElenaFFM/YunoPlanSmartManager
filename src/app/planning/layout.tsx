@@ -6,7 +6,7 @@ export default function PlanningLayout({ children }: { children: React.ReactNode
   return (
     <IdentityProvider>
       <main>
-        <p className="eyebrow">Fase 3 · Motor de dominio</p>
+        <p className="eyebrow">Fase 4 · Planificación</p>
         <h1 style={{ fontSize: "2.2rem" }}>Campañas</h1>
         <nav className="tabs">
           <Link href="/planning/campanas">Campañas</Link>
