@@ -384,6 +384,58 @@ button.secondary {
   background: #9a5eb7;
 }
 
+.wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wizard-steps li {
+  background: #ece7e7;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
+.wizard-steps li.current {
+  background: #dcefe6;
+  color: var(--accent);
+}
+
+.wizard-steps li.complete {
+  background: #e9eff9;
+  color: #2c5c9e;
+}
+
+.draft-review {
+  background: #f8faf8;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.draft-review h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.draft-review p {
+  margin: 0 0 0.75rem;
+}
+
+.draft-review ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
 @media (max-width: 42rem) {
   .range-row {
     grid-template-columns: 1fr;

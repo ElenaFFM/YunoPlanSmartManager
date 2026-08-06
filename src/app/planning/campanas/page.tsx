@@ -331,6 +331,29 @@ function CampaignConfigurationForm({
   const [description, setDescription] = useState(initial.description);
   const [changeReason, setChangeReason] = useState(initial.changeReason);
   const [segments, setSegments] = useState<DraftSegment[]>(initial.segments);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [stepError, setStepError] = useState<string | null>(null);
+
+  function advance() {
+    if (step === 1 && (!name.trim() || !changeReason.trim())) {
+      setStepError("Completá el nombre y el motivo para continuar.");
+      return;
+    }
+    if (
+      step === 2 &&
+      segments.some(
+        (segment) =>
+          !segment.startAt ||
+          segment.rangeChanges.length === 0 ||
+          (segment.target.type === "BANK" && !segment.target.bankId),
+      )
+    ) {
+      setStepError("Completá el alcance, el inicio y al menos un tramo afectado en cada segmento.");
+      return;
+    }
+    setStepError(null);
+    setStep((current) => (current === 3 ? current : ((current + 1) as 1 | 2 | 3)));
+  }
 
   return (
     <form
@@ -346,26 +369,94 @@ function CampaignConfigurationForm({
       }}
     >
       <h2>{title}</h2>
-      <label>
-        Nombre
-        <input value={name} onChange={(event) => setName(event.target.value)} required />
-      </label>
-      <label>
-        Descripción
-        <input value={description} onChange={(event) => setDescription(event.target.value)} />
-      </label>
-      <label>
-        Motivo del cambio
-        <input value={changeReason} onChange={(event) => setChangeReason(event.target.value)} required />
-      </label>
+      <ol className="wizard-steps" aria-label="Pasos de configuración">
+        <li className={step === 1 ? "current" : step > 1 ? "complete" : ""}>1. Datos</li>
+        <li className={step === 2 ? "current" : step > 2 ? "complete" : ""}>2. Vigencia y cuotas</li>
+        <li className={step === 3 ? "current" : ""}>3. Revisar</li>
+      </ol>
 
-      <h3>Segmentos</h3>
-      <SegmentEditor segments={segments} onChange={setSegments} banks={banks} />
+      {step === 1 && (
+        <>
+          <p className="muted">Definí la intención comercial. La campaña se guarda inicialmente como borrador.</p>
+          <label>
+            Nombre
+            <input value={name} onChange={(event) => setName(event.target.value)} required />
+          </label>
+          <label>
+            Descripción
+            <input value={description} onChange={(event) => setDescription(event.target.value)} />
+          </label>
+          <label>
+            Motivo del cambio
+            <input value={changeReason} onChange={(event) => setChangeReason(event.target.value)} required />
+          </label>
+        </>
+      )}
 
-      <button type="submit" disabled={disabled}>
-        {submitLabel}
-      </button>
+      {step === 2 && (
+        <>
+          <p className="muted">Elegí alcance, vigencia y la transformación exacta de cada tramo.</p>
+          <SegmentEditor segments={segments} onChange={setSegments} banks={banks} />
+        </>
+      )}
+
+      {step === 3 && <CampaignDraftReview name={name} description={description} segments={segments} banks={banks} />}
+
+      {stepError && <p className="identity-badge-error">{stepError}</p>}
+      <div className="actions">
+        {step > 1 && (
+          <button type="button" className="secondary" onClick={() => { setStepError(null); setStep((current) => (current - 1) as 1 | 2 | 3); }}>
+            Volver
+          </button>
+        )}
+        {step < 3 ? (
+          <button type="button" onClick={advance} disabled={disabled}>
+            Continuar
+          </button>
+        ) : (
+          <button type="submit" disabled={disabled}>
+            {submitLabel}
+          </button>
+        )}
+      </div>
     </form>
+  );
+}
+
+function CampaignDraftReview({
+  name,
+  description,
+  segments,
+  banks,
+}: {
+  name: string;
+  description: string;
+  segments: DraftSegment[];
+  banks: Bank[];
+}) {
+  return (
+    <section className="draft-review" aria-labelledby="draft-review-title">
+      <h3 id="draft-review-title">Revisión del borrador</h3>
+      <p>
+        <strong>{name}</strong>
+        {description ? ` · ${description}` : ""}
+      </p>
+      <ul>
+        {segments.map((segment) => (
+          <li key={segment.id}>
+            <strong>{targetLabel(segment.target, banks)}</strong>: {segment.startAt || "inicio sin definir"} → {segment.endAt || "indefinida"}
+            <ul>
+              {segment.rangeChanges.map((change, index) => (
+                <li key={`${segment.id}-${index}`}>
+                  Tramo {change.rangeIndex}: {transformationLabel(change.transformation)}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      <p className="muted">Al guardar se aplican las validaciones de servidor y la campaña queda en estado DRAFT.</p>
+    </section>
   );
 }
 

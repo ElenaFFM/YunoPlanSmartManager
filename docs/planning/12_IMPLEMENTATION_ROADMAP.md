@@ -130,7 +130,7 @@ Fase cerrada salvo property-based tests (deliberadamente postergadas) y la trans
 
 - [ ] Dashboard operativo (depende de estados de ejecución e importación remota).
 - [x] Calendario/timeline inicial accesible en `/planning/campanas`: barras visuales por alcance y tabla cronológica equivalente; no hay edición directa sobre el calendario.
-- [ ] Asistente de campaña por pasos. El formulario actual sigue siendo el editor completo de segmentos; no oculta ni ejecuta operaciones.
+- [x] Asistente de campaña por pasos en `/planning/campanas`: datos comerciales, vigencia/cuotas y revisión antes de guardar. Valida los datos mínimos de cada paso y conserva la validación completa en servidor; el guardado crea o versiona un `DRAFT`, sin ejecutar operaciones.
 - [x] Tabla de impacto lógico por segmento, con antes/durante/después respecto de la plantilla activa. La comparación con planes remotos se completará después de la importación/reconciliación (Fase 5).
 - [x] Historial de versiones actual y supersedidas, con estado, motivo, fecha y prefijo del hash canónico.
 - [x] Errores y warnings de validación de campaña visibles al crear o editar; falta consolidarlos en el flujo guiado.
