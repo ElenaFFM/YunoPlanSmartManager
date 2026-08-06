@@ -17,6 +17,7 @@ import { RemotePlanImportError } from "@/modules/executions/application/remote-p
 import { RemotePlanReconciliationError } from "@/modules/executions/application/remote-plan-reconciliation";
 import { ExecutionPlanQueueError } from "@/modules/executions/application/execution-plan-service";
 import { SandboxVerificationPlanError } from "@/modules/executions/application/sandbox-verification-plan";
+import { ExecutionRunNotFoundError } from "@/modules/executions/application/execution-run-query";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 
 export const effectiveConfigurationQuerySchema = z.object({
@@ -143,6 +144,10 @@ export function planningErrorResponse(error: unknown) {
       { error: { code: error.code, message: error.message } },
       { status: error.status },
     );
+  }
+
+  if (error instanceof ExecutionRunNotFoundError) {
+    return NextResponse.json({ error: { code: error.code, message: error.message } }, { status: error.status });
   }
 
   if (error instanceof InvalidRemotePlanSnapshotError || error instanceof YunoApiError) {

@@ -15,6 +15,9 @@ import {
   type CampaignTarget,
   type InstallmentTransformation,
   type ValidationFinding,
+  enqueueSandboxVerification,
+  getExecutionRunProgress,
+  type ExecutionRunProgress,
 } from "../planning-client";
 import { CampaignImpact, CampaignTimeline, CampaignVersionHistory } from "../campaign-insights";
 
@@ -231,6 +234,8 @@ export default function CampanasPage() {
             canWrite={canWrite}
             disabled={busy}
             onSubmit={(input) => run(() => updateCampaign(userId, campaign.id, input))}
+            userId={userId}
+            isAdmin={identity.status === "ready" && identity.identity.role === "ADMIN"}
           />
         ))}
         {campaigns.length === 0 && <p>Todavía no hay campañas cargadas.</p>}
@@ -245,12 +250,16 @@ function CampaignCard({
   canWrite,
   disabled,
   onSubmit,
+  userId,
+  isAdmin,
 }: {
   campaign: Campaign;
   banks: Bank[];
   canWrite: boolean;
   disabled: boolean;
   onSubmit: (input: CampaignConfigurationInput) => void;
+  userId: string;
+  isAdmin: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const version = campaign.currentVersion;
@@ -282,6 +291,7 @@ function CampaignCard({
 
       <CampaignImpact campaign={campaign} banks={banks} />
       <CampaignVersionHistory campaign={campaign} />
+      {isAdmin && <CampaignVerification campaignId={campaign.id} userId={userId} />}
 
       {canWrite && (
         <>
@@ -310,6 +320,29 @@ function CampaignCard({
       )}
     </article>
   );
+}
+
+function CampaignVerification({ campaignId, userId }: { campaignId: string; userId: string }) {
+  const [run, setRun] = useState<ExecutionRunProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const active = run?.status === "QUEUED" || run?.status === "RUNNING";
+  const activeRunId = active ? run?.id : null;
+  useEffect(() => {
+    if (!activeRunId) return;
+    const timer = window.setInterval(() => getExecutionRunProgress(userId, activeRunId).then(setRun).catch(() => setError("No se pudo actualizar el progreso.")), 3_000);
+    return () => window.clearInterval(timer);
+  }, [activeRunId, userId]);
+  async function start() {
+    setError(null);
+    try { setRun(await enqueueSandboxVerification(userId, campaignId, `verify-${campaignId}-${crypto.randomUUID()}`)); }
+    catch (err) { setError(err instanceof PlanningApiError ? err.message : "No se pudo encolar la verificación."); }
+  }
+  return <section className="card"><h3>Verificación sandbox</h3>
+    <p className="muted">Controla el baseline remoto antes de habilitar cualquier cambio.</p>
+    <button onClick={start} disabled={active}>{active ? "Verificación en curso" : "Encolar verificación"}</button>
+    {error && <p className="identity-badge-error">{error}</p>}
+    {run && <><p>Run {run.status} · {run.lastConfirmedOperation}/{run.operations.length} operaciones confirmadas.</p><ol>{run.operations.map((operation) => <li key={operation.id}>#{operation.sequence} {operation.type}: {operation.status}{operation.errorMessage ? ` — ${operation.errorMessage}` : ""}</li>)}</ol></>}
+  </section>;
 }
 
 function CampaignConfigurationForm({

@@ -70,6 +70,12 @@ export type UpdateCampaignResult = {
   revokedApprovals: number;
 };
 
+export type ExecutionRunProgress = {
+  id: string; status: string; planHash: string; lastConfirmedOperation: number; failureClassification: string | null;
+  deployment: { environment: string; status: string };
+  operations: Array<{ id: string; sequence: number; type: string; status: string; resultCertainty: string | null; errorMessage: string | null }>;
+};
+
 export class PlanningApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -125,4 +131,12 @@ export function updateCampaign(userId: string, campaignId: string, input: Campai
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+export function enqueueSandboxVerification(userId: string, campaignId: string, idempotencyKey: string) {
+  return apiFetch<ExecutionRunProgress>(userId, `/api/planning/campaigns/${campaignId}/sandbox-verification`, { method: "POST", body: JSON.stringify({ idempotencyKey }) });
+}
+
+export function getExecutionRunProgress(userId: string, runId: string) {
+  return apiFetch<ExecutionRunProgress>(userId, `/api/planning/execution-runs/${runId}`);
 }

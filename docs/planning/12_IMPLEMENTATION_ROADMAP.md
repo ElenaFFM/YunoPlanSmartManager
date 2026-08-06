@@ -163,7 +163,7 @@ La DB representa el baseline aceptado de sandbox y producción.
 - create/update/delete/verify.
 - [x] locks e idempotencia local al encolar un `ExecutionPlan` sandbox.
 - compensaciones.
-- pantalla de progreso.
+- [x] pantalla de progreso: la campaña permite encolar una verificación sandbox y muestra el `ExecutionRun`/operaciones con polling cada 3 segundos; la API de detalle es de solo lectura para los tres roles.
 - inyección de fallos.
 
 ### Salida
