@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useIdentity } from "../identity-provider";
+import { useIdentity } from "@/components/identity/identity-provider";
 import {
   type Bank,
   type TestCard,

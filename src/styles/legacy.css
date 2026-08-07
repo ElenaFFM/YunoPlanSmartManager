@@ -1,0 +1,451 @@
+/**
+ * @deprecated Contenido íntegro del globals.css original (pre-rediseño).
+ * No agregar consumidores nuevos de estas clases — migran página por página
+ * al kit de componentes en src/components/ui. Ver docs/planning/16_DESIGN_SYSTEM.md.
+ * Este archivo se borra en la Etapa 10 del rediseño cuando ya no quede ningún
+ * consumidor (verificable con grep de cada clase contra src/app).
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 4rem 1.5rem;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: clamp(2.2rem, 6vw, 4.5rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin: 1rem 0;
+  max-width: 12ch;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1.6;
+  max-width: 44rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin-top: 3rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+
+.card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 0.75rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1.5rem 0 0.75rem;
+}
+
+.tabs a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tabs a:hover {
+  text-decoration: underline;
+}
+
+.identity-badge {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.identity-badge-error {
+  color: #a3312a;
+  font-size: 0.9rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.3rem;
+}
+
+.form input,
+.form select {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  padding: 0.5rem 0.65rem;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  width: fit-content;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+button.secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.card-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.status-badge {
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: #dcefe6;
+  color: var(--accent);
+}
+
+.status-inactive {
+  background: #f2e9d8;
+  color: #8a6a1f;
+}
+
+.status-archived {
+  background: #ece7e7;
+  color: var(--muted);
+}
+
+.iin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.iin-list li {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.inline-form input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+}
+
+.range-row {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr 1fr 1.4fr auto;
+}
+
+.range-row input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.audit-table-wrap {
+  overflow-x: auto;
+}
+
+.audit-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.audit-table th,
+.audit-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.audit-table code {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.campaign-insight {
+  border-top: 1px solid var(--border);
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+
+.campaign-insight h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.45rem;
+}
+
+.impact-table {
+  min-width: 44rem;
+}
+
+.version-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.version-history li {
+  border-left: 3px solid var(--border);
+  display: grid;
+  gap: 0.2rem;
+  padding-left: 0.75rem;
+}
+
+.version-history div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.version-history li > span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.version-history code {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.current-version {
+  background: #dcefe6;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  text-transform: uppercase;
+}
+
+.status-draft {
+  background: #e9eff9;
+  color: #2c5c9e;
+}
+
+.status-validated {
+  background: #dcefe6;
+  color: var(--accent);
+}
+
+.status-superseded {
+  background: #ece7e7;
+  color: var(--muted);
+}
+
+.calendar-panel {
+  margin: 2rem 0;
+}
+
+.timeline-visual {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 1rem 0;
+  overflow: hidden;
+  padding: 0.6rem;
+}
+
+.timeline-row {
+  background-image: linear-gradient(to right, transparent 24.9%, var(--border) 25%, transparent 25.1%, transparent 49.9%, var(--border) 50%, transparent 50.1%, transparent 74.9%, var(--border) 75%, transparent 75.1%);
+  min-height: 1.65rem;
+  position: relative;
+}
+
+.timeline-label {
+  color: var(--muted);
+  display: block;
+  font-size: 0.75rem;
+  overflow: hidden;
+  padding: 0.2rem 0.35rem;
+  position: relative;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.timeline-bar {
+  border-radius: 999px;
+  bottom: 0.2rem;
+  opacity: 0.84;
+  position: absolute;
+  top: 0.2rem;
+}
+
+.timeline-general {
+  background: #407dce;
+}
+
+.timeline-bank {
+  background: var(--accent);
+}
+
+.timeline-amex {
+  background: #9a5eb7;
+}
+
+.wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wizard-steps li {
+  background: #ece7e7;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+}
+
+.wizard-steps li.current {
+  background: #dcefe6;
+  color: var(--accent);
+}
+
+.wizard-steps li.complete {
+  background: #e9eff9;
+  color: #2c5c9e;
+}
+
+.draft-review {
+  background: #f8faf8;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.draft-review h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.draft-review p {
+  margin: 0 0 0.75rem;
+}
+
+.draft-review ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+/* Clase usada por campanas/page.tsx sin definición propia (hallazgo del rediseño):
+   se agrega acá, sin cambiar layout, para no dejar un bloque de confirmación sin estilos
+   mientras esa página no migra al kit nuevo (Etapa 8). */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 42rem) {
+  .range-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,3 +1,7 @@
+import { apiFetch, ApiError, type ValidationFinding, type ValidationSeverity } from "@/lib/api";
+
+export type { ValidationFinding, ValidationSeverity };
+
 export type CampaignVersionStatus = "DRAFT" | "VALIDATED" | "SUPERSEDED";
 
 export type CampaignTarget = { type: "GENERAL" } | { type: "AMEX" } | { type: "BANK"; bankId: string };
@@ -40,15 +44,6 @@ export type Campaign = {
   createdAt: string;
   currentVersion: CampaignVersion | null;
   versions: CampaignVersion[];
-};
-
-export type ValidationSeverity = "ERROR" | "WARNING" | "INFO";
-
-export type ValidationFinding = {
-  code: string;
-  severity: ValidationSeverity;
-  message: string;
-  field?: string;
 };
 
 export type CampaignConfigurationInput = {
@@ -112,40 +107,8 @@ export type RemotePlanImportResult = {
   planIds?: string[];
 };
 
-export class PlanningApiError extends Error {
-  readonly code: string;
-  readonly status: number;
-  readonly findings: ValidationFinding[];
-
-  constructor(status: number, code: string, message: string, findings: ValidationFinding[] = []) {
-    super(message);
-    this.name = "PlanningApiError";
-    this.status = status;
-    this.code = code;
-    this.findings = findings;
-  }
-}
-
-async function apiFetch<T>(userId: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      "x-yuno-user-id": userId,
-      ...init?.headers,
-    },
-  });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new PlanningApiError(
-      response.status,
-      body?.error?.code ?? "UNKNOWN",
-      body?.error?.message ?? "No se pudo completar la operación.",
-      body?.error?.findings ?? [],
-    );
-  }
-  return body.data as T;
-}
+/** @deprecated Alias de ApiError durante la migración (ver src/lib/api). Usar ApiError directamente en código nuevo. */
+export const PlanningApiError = ApiError;
 
 export function listCampaigns(userId: string) {
   return apiFetch<Campaign[]>(userId, "/api/planning/campaigns");

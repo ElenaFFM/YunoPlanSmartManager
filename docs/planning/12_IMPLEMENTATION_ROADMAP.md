@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 7 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real; Fase 7 con `TestRun`/`TestCaseResult`, checkpoints lógicos, gate `SDK-001`-`SDK-009` y reinicialización real de sandbox reusando el worker de Fase 6, verificado en vivo)
+**Última actualización:** 7 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real; Fase 7 con `TestRun`/`TestCaseResult`, checkpoints lógicos, gate `SDK-001`-`SDK-009` y reinicialización real de sandbox reusando el worker de Fase 6, verificado en vivo; **ampliación de Fase 4 iniciada** — rediseño integral de la UI de toda la aplicación en 10 etapas, Etapa 1 de fundaciones cerrada, ver el detalle dentro de la Fase 4 más abajo)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -145,6 +145,21 @@ Fase cerrada salvo property-based tests (deliberadamente postergadas). La transi
 ### Salida
 
 Un usuario puede crear y validar un borrador complejo sin escribir JSON.
+
+### Ampliación 2026-08-07: rediseño integral de UI
+
+Lo anterior cubría solo campañas. El usuario pidió ampliar el alcance a **toda** la aplicación (catálogo, campañas, planes remotos, laboratorio SDK, auditoría) porque la interfaz actual es desordenada — la causa raíz identificada es la ausencia de una capa de componentes React compartidos, no una mezcla de frameworks de CSS. Alcance completo, decisiones de arquitectura y las 10 etapas de migración documentadas en `16_DESIGN_SYSTEM.md`. Criterio central explícito del usuario: el módulo de campañas (wizard, Gantt, configuración de promos, distinción vigente/futura/pasada) es el proceso más complejo del sistema y tiene que quedar el más amigable y claro de toda la app, no solo el más funcional.
+
+- [x] **Etapa 1 — Fundaciones invisibles:** capas de CSS (`src/styles/{tokens,reset,base,legacy}.css`), cliente API unificado (`src/lib/api/`, con `describeError` implementando los 4 niveles de notificación), formatters y mapas de etiquetas es-AR (`src/lib/format.ts`, `src/lib/labels/`). Cero cambio visual, cero páginas tocadas; verificado con typecheck, 149 tests y build en verde.
+- [x] **Etapa 2 — AppShell, navegación global y notificaciones base:** sidebar (4 grupos, secciones no construidas visibles como "Próximamente") + topbar con indicador de ambiente (`GET /api/environment`, nuevo) e identidad, reemplazando los tabs duplicados de `catalog/layout.tsx`/`planning/layout.tsx`; `GlobalNotices`/`AlertStack`. Verificado en vivo (bancos, auditoría, campañas) sin errores de consola, más typecheck/lint/149 tests/build en verde.
+- [ ] **Etapa 3 — Kit de UI completo** (`src/components/ui/**`): Button, Field, Card, StatusBadge, DataTable, Modal, ConfirmDialog, Tabs, EmptyState, AsyncBoundary, Stepper, ProgressList. Catálogo vivo en `/dev/ui`.
+- [ ] **Etapa 4 — Piloto: Auditoría**, con filtros/paginación/exportación que hoy faltan.
+- [ ] **Etapa 5 — Catálogo** (tarjetas → bancos → plantillas), extrayendo el patrón triplicado `CreateXForm`/`XCard`.
+- [ ] **Etapa 6 — Ejecuciones:** polling unificado, `/planning/ejecuciones`, pantalla de reconciliación de operación incierta.
+- [ ] **Etapa 7 — Planes remotos** sobre `DataTable` + patrón de cola de revisión.
+- [ ] **Etapa 8 — Campañas:** split lista/detalle, wizard real de 6 pasos, tabla de confirmación de 9 columnas. Requiere `GET /api/planning/campaigns/:id/deployment-plan` de solo lectura (dependencia de backend).
+- [ ] **Etapa 9 — Calendario y Línea de tiempo (Gantt):** modelo puro testeado, alternativa tabular primero, sin drag en v1.
+- [ ] **Etapa 10 — Inicio, Administración y limpieza final:** dashboard (requiere endpoint de agregados), `/admin`, retiro de `legacy.css`, pasada de accesibilidad/responsive.
 
 ## Fase 5: Registro remoto e importación
 

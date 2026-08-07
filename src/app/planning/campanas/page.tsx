@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useIdentity } from "../../catalog/identity-provider";
+import { useIdentity } from "@/components/identity/identity-provider";
 import { listBanks, type Bank } from "../../catalog/catalog-client";
 import {
   createCampaign,

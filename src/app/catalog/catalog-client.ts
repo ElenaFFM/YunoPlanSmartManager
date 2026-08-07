@@ -1,3 +1,5 @@
+import { apiFetch, ApiError } from "@/lib/api";
+
 export type CatalogStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 export type IinStatus = "ACTIVE" | "INACTIVE";
 
@@ -55,37 +57,8 @@ export type TestCard = {
   active: boolean;
 };
 
-export class CatalogApiError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.name = "CatalogApiError";
-    this.status = status;
-    this.code = code;
-  }
-}
-
-async function apiFetch<T>(userId: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      "x-yuno-user-id": userId,
-      ...init?.headers,
-    },
-  });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new CatalogApiError(
-      response.status,
-      body?.error?.code ?? "UNKNOWN",
-      body?.error?.message ?? "No se pudo completar la operación.",
-    );
-  }
-  return body.data as T;
-}
+/** @deprecated Alias de ApiError durante la migración (ver src/lib/api). Usar ApiError directamente en código nuevo. */
+export const CatalogApiError = ApiError;
 
 export function listBanks(userId: string) {
   return apiFetch<Bank[]>(userId, "/api/catalog/banks");

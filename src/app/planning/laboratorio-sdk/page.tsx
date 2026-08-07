@@ -3,7 +3,7 @@
 import { loadScript } from "@yuno-payments/sdk-web";
 import { useEffect, useRef, useState } from "react";
 import type { SdkPaymentsInstance } from "@yuno-payments/sdk-web-types";
-import { useIdentity } from "../../catalog/identity-provider";
+import { useIdentity } from "@/components/identity/identity-provider";
 import { extractCheckoutSessionId } from "@/modules/sdk-lab/domain/checkout-session";
 import {
   completeTestRun,
