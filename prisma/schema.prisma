@@ -97,6 +97,25 @@ enum ResultCertainty {
   UNKNOWN
 }
 
+enum RemotePlanStatus {
+  ACTIVE
+  FUTURE
+  EXPIRED
+  DELETED
+  UNKNOWN
+}
+
+enum RemotePlanOrigin {
+  TOOL
+  IMPORTED
+}
+
+enum RemotePlanImportStatus {
+  PENDING
+  CLASSIFIED
+  ANOMALY
+}
+
 model User {
   id          String     @id @default(cuid())
   email       String     @unique
@@ -268,8 +287,48 @@ model Deployment {
   campaignVersion CampaignVersion @relation(fields: [campaignVersionId], references: [id])
   createdBy       User            @relation("DeploymentCreatedBy", fields: [createdById], references: [id])
   runs            ExecutionRun[]
+  remotePlans     RemotePlan[]
 
   @@index([environment, status, scheduledAt])
+}
+
+model RemotePlan {
+  id                   String                 @id @default(cuid())
+  deploymentId         String?
+  environment          Environment
+  accountId            String
+  yunoPlanId           String
+  name                 String
+  rangeIndex           Int?
+  segmentKey           String?
+  requestSnapshot      Json?
+  responseSnapshot     Json
+  remoteCreatedAt      DateTime
+  remoteUpdatedAt      DateTime
+  startAt              DateTime?
+  finishAt             DateTime?
+  status               RemotePlanStatus
+  deletedAt            DateTime?
+  deleteReason         String?
+  replacesRemotePlanId String?
+  equivalentLogicalKey String?
+  origin               RemotePlanOrigin       @default(IMPORTED)
+  importStatus         RemotePlanImportStatus @default(PENDING)
+  importNotes          Json?
+  importedAt           DateTime               @default(now())
+  lastSeenAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  deployment Deployment? @relation(fields: [deploymentId], references: [id])
+  replaces  RemotePlan?  @relation("RemotePlanReplacement", fields: [replacesRemotePlanId], references: [id])
+  replacedBy RemotePlan[] @relation("RemotePlanReplacement")
+
+  @@unique([environment, yunoPlanId])
+  @@index([environment, status, startAt, finishAt])
+  @@index([deploymentId])
+  @@index([importStatus, lastSeenAt])
+  @@index([replacesRemotePlanId])
 }
 
 model ExecutionRun {

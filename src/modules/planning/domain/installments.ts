@@ -56,3 +56,33 @@ export function capMaximumInstallment(
   return createInstallmentSet(baseline.filter((installment) => installment <= maximum));
 }
 
+export function setExactInstallments(installments: InstallmentSet): InstallmentSet {
+  return createInstallmentSet(installments);
+}
+
+export function restoreBaseline(baseline: InstallmentSet): InstallmentSet {
+  return createInstallmentSet(baseline);
+}
+
+export type InstallmentTransformation =
+  | { type: "ADD_EXACT_INSTALLMENTS"; additions: InstallmentSet }
+  | { type: "CAP_MAX_INSTALLMENT"; maximum: number }
+  | { type: "SET_EXACT_INSTALLMENTS"; installments: InstallmentSet }
+  | { type: "RESTORE_BASELINE" };
+
+export function applyInstallmentTransformation(
+  baseline: InstallmentSet,
+  transformation: InstallmentTransformation,
+): InstallmentSet {
+  switch (transformation.type) {
+    case "ADD_EXACT_INSTALLMENTS":
+      return addExactInstallments(baseline, transformation.additions);
+    case "CAP_MAX_INSTALLMENT":
+      return capMaximumInstallment(baseline, transformation.maximum);
+    case "SET_EXACT_INSTALLMENTS":
+      return setExactInstallments(transformation.installments);
+    case "RESTORE_BASELINE":
+      return restoreBaseline(baseline);
+  }
+}
+

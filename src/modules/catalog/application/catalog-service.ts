@@ -58,12 +58,17 @@ const TEMPLATE_STATUS_TRANSITIONS: Record<CatalogStatus, readonly CatalogStatus[
   ARCHIVED: [],
 };
 
+/**
+ * `BANK` exige banco; `GENERAL` no admite ninguno. `AMEX` lo admite de forma
+ * opcional: es el lugar donde viven sus BIN/IIN, que el catálogo de alcances
+ * necesita para resolver la prioridad de Amex.
+ */
 function validateTemplateBankAssociation(scope: TemplateScope, bankId: string | undefined) {
   if (scope === "BANK" && !bankId) {
     throw new CatalogInputError("CAT-TPL-002", "Una plantilla bancaria requiere un banco.");
   }
-  if (scope !== "BANK" && bankId) {
-    throw new CatalogInputError("CAT-TPL-002", "Solo una plantilla bancaria puede indicar un banco.");
+  if (scope === "GENERAL" && bankId) {
+    throw new CatalogInputError("CAT-TPL-002", "Una plantilla General no puede indicar un banco.");
   }
 }
 
