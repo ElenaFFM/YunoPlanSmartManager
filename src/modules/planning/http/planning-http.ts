@@ -21,6 +21,7 @@ import { CampaignDeploymentPlanError } from "@/modules/executions/application/ca
 import { ExecutionRunNotFoundError } from "@/modules/executions/application/execution-run-query";
 import { YunoApiError } from "@/modules/executions/infrastructure/yuno-client";
 import { GandalfCheckoutApiError } from "@/modules/sdk-lab/infrastructure/gandalf-checkout-client";
+import { TestRunInputError } from "@/modules/sdk-lab/application/test-run-service";
 
 export const effectiveConfigurationQuerySchema = z.object({
   bin: z.string().regex(/^\d{6,8}$/, "El BIN debe tener entre 6 y 8 dígitos."),
@@ -60,6 +61,21 @@ export const updateRemotePlanClassificationSchema = z.object({
 
 export const executionPlanRequestSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(200),
+});
+
+export const startTestRunSchema = z.object({
+  campaignId: z.string().min(1),
+  checkpoint: z.discriminatedUnion("checkpoint", [
+    z.object({ checkpoint: z.literal("BEFORE") }),
+    z.object({ checkpoint: z.literal("AFTER") }),
+    z.object({ checkpoint: z.literal("DURING"), segmentIndex: z.number().int().nonnegative() }),
+  ]),
+});
+
+export const recordTestCaseResultSchema = z.object({
+  observedInstallments: z.array(z.number().int().positive()).min(1),
+  result: z.enum(["PASSED", "FAILED", "NOT_APPLICABLE"]),
+  justification: z.string().trim().min(1).max(1000).optional(),
 });
 
 export function planningErrorResponse(error: unknown) {
@@ -160,6 +176,13 @@ export function planningErrorResponse(error: unknown) {
     return NextResponse.json(
       { error: { code: "REMOTE_READ_FAILED", message: "No se pudo interpretar la respuesta de Yuno." } },
       { status: 502 },
+    );
+  }
+
+  if (error instanceof TestRunInputError) {
+    return NextResponse.json(
+      { error: { code: error.code, message: error.message, findings: error.findings } },
+      { status: error.status },
     );
   }
 

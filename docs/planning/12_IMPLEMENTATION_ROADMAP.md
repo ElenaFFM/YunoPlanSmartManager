@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real)
+**Última actualización:** 7 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real; Fase 7 con `TestRun`/`TestCaseResult`, checkpoints lógicos, gate `SDK-001`-`SDK-009` y reinicialización real de sandbox reusando el worker de Fase 6, verificado en vivo)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -186,17 +186,20 @@ Una campaña se aplica y revierte con seguridad en sandbox, incluyendo el cálcu
 - [x] UI inicial de laboratorio: permite crear y validar una `checkout_session` sandbox desde datos de prueba y muestra su identificador, sin iniciar checkout ni pagos.
 - [x] Lite SDK cargado e inicializado en sandbox mediante `@yuno-payments/sdk-web` en `/planning/laboratorio-sdk`; usa SRI, requiere `OPERATOR`/`ADMIN` y no inicia checkout ni pagos.
 - [x] BFF de sesion de checkout sandbox: `POST /api/planning/sdk/checkout-sessions` crea la sesion usando `GANDALF_CHECKOUT_SESSION_URL`, solo para `OPERATOR`/`ADMIN` y con `YUNO_ENV=sandbox`. La respuesta queda sin cache y se audita sin PII. Falta recibir el contrato de respuesta/inicializacion del SDK para embeberlo y observar cuotas.
-
-- integración SDK sin pagos.
-- checkpoints lógicos.
-- fechas ficticias aisladas.
-- TestRun y matriz de casos.
-- reinicialización a baseline conocido y cleanup informativo.
-- gate de pruebas.
+- [x] Modelo `TestRun`/`TestCaseResult` (migración `20260806225346_test_runs`): checkpoint lógico (`BEFORE`/`DURING`/`AFTER`), `dateShiftSeconds` aislado de `CampaignVersion`, lock exclusivo (`lockKey`), referencias a los `ExecutionRun` de reset/build/cleanup y hash probado (`testedHash`) para `SDK-009`.
+- [x] Checkpoints lógicos (`src/modules/sdk-lab/domain/checkpoints.ts`): `deriveRequiredCheckpoints` deriva `BEFORE` + un `DURING` por cada `CampaignSegment` + `AFTER` (o `NOT_APPLICABLE` automático si algún segmento queda indefinido), dominio puro y testeado.
+- [x] Gate `SDK-001` a `SDK-009` (`src/modules/sdk-lab/domain/sdk-gate.ts` + `test-run-service.ts`): `SDK-001`/`SDK-007`/`SDK-008` son invariantes de flujo (ambiente forzado sandbox, baseline confirmado antes de habilitar el SDK, lock único); `SDK-002`/`SDK-003`/`SDK-004`/`SDK-006`/`SDK-009` son validaciones de dominio puro y testeadas. `GET /api/planning/campaigns/:id/test-gate` expone el estado agregado — **informativo, no bloquea** `DRAFT→VALIDATED` ni ningún despliegue; es la base para el gate de producción de Fase 8.
+- [x] Matriz de casos por checkpoint (`test-run-service.ts`, reusa `buildAmountCases` de `sdk-case-generation.ts`): por cada alcance/tramo que la campaña toca, cuotas esperadas en el instante del checkpoint + montos mínimo/máximo/interior/adyacentes + tarjeta de prueba representativa (`GET /api/planning/campaigns/:id/test-matrix`, solo lectura).
+- [x] Reinicialización real a baseline conocido y creación de los planes del checkpoint (`§4` pasos 5-7): `POST /api/planning/test-runs` reusa el `ExecutionRun`/worker de Fase 6 sin cambios — encola un run de `DELETE` (solo planes cuyo `Deployment.kind=TEST`, nunca datos reales importados ni despliegues comerciales `CANONICAL`) y un run de `CREATE` del baseline completo + los tramos del checkpoint, con nombre `[TEST]` y correlation ID (`src/modules/sdk-lab/domain/create-payload.ts`). El worker es secuencial por `queuedAt`, así que el reset termina antes de que el build se reclame.
+- [x] Registro de resultados y cierre: `PATCH /api/planning/test-runs/:id/cases/:caseId` fuerza `FAILED` ante cualquier desajuste esperado/observado (`SDK-005`) sin importar qué pidió el operador; `POST /api/planning/test-runs/:id/complete` exige todos los casos resueltos y dispara una limpieza best-effort (`§4` paso 11, informativa — nunca bloquea el cierre del ensayo).
+- [x] UI en `/planning/laboratorio-sdk`: selector de campaña, tabla de checkpoints con su estado de gate, inicio de ensayo con confirmación de dos pasos, polling de progreso, registro manual de cuotas observadas por caso (captura manual, D-029) y panel de gate.
+- [ ] Tarjetas/BIN de prueba reales para que `SDK-004` deje de bloquear: hoy no hay datos de prueba cargados, así que ningún ensayo puede arrancar hasta cargar `TestCard` para cada banco afectado desde `/catalog/tarjetas` — verificado en vivo contra la base de pruebas.
+- [ ] Prueba de integración automatizada del flujo completo (`test:integration:test-run`, con `fake-yuno-client.ts` como en `execution-worker.integration.ts`): quedó fuera de esta iteración; la cobertura actual es unitaria (`checkpoints.test.ts`, `sdk-gate.test.ts`) más la verificación manual contra el dev server y la base de pruebas real.
+- [ ] Property-based / cobertura exhaustiva de la matriz de casos (mismo criterio que Fase 3: casos concretos por ahora, sin agregar dependencias nuevas).
 
 ### Salida
 
-Antes/durante/después pueden validarse y quedan auditados.
+Antes/durante/después pueden validarse y quedan auditados: un `OPERATOR`/`ADMIN` reinicializa el sandbox descartable, corre un ensayo real por checkpoint y registra cuotas esperadas vs. observadas, con un gate informativo (`SDK-001` a `SDK-009`) que preparará el futuro gate de producción. Fase abierta: falta cargar tarjetas de prueba reales para destrabar `SDK-004` y una prueba de integración automatizada del flujo end-to-end.
 
 ## Fase 8: Aprobación y producción
 

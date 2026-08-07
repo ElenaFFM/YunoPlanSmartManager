@@ -116,6 +116,50 @@ enum RemotePlanImportStatus {
   ANOMALY
 }
 
+enum TestRunLogicalCheckpoint {
+  BEFORE
+  DURING
+  AFTER
+}
+
+enum TestRunStatus {
+  PENDING
+  RESETTING
+  BUILDING
+  READY
+  RECORDING
+  COMPLETED
+  FAILED
+  ABORTED
+}
+
+enum TestRunCleanupStatus {
+  NOT_STARTED
+  CLEANED
+  RESIDUAL
+}
+
+enum TestCaseScope {
+  AMEX
+  BANK
+  GENERAL
+}
+
+enum TestCaseAmountLabel {
+  MIN
+  MAX
+  INTERIOR
+  ADJACENT_BELOW_MIN
+  ADJACENT_ABOVE_MAX
+}
+
+enum TestCaseResultStatus {
+  PENDING
+  PASSED
+  FAILED
+  NOT_APPLICABLE
+}
+
 model User {
   id          String     @id @default(cuid())
   email       String     @unique
@@ -125,13 +169,15 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  campaignsCreated Campaign[]        @relation("CampaignCreatedBy")
-  versionsCreated  CampaignVersion[] @relation("VersionCreatedBy")
-  deployments      Deployment[]      @relation("DeploymentCreatedBy")
-  runsRequested    ExecutionRun[]    @relation("RunRequestedBy")
-  approvals        Approval[]        @relation("ApprovalDecidedBy")
-  templateVersions TemplateVersion[] @relation("TemplateVersionCreatedBy")
-  auditEvents      AuditEvent[]      @relation("AuditEventActor")
+  campaignsCreated  Campaign[]         @relation("CampaignCreatedBy")
+  versionsCreated   CampaignVersion[]  @relation("VersionCreatedBy")
+  deployments       Deployment[]       @relation("DeploymentCreatedBy")
+  runsRequested     ExecutionRun[]     @relation("RunRequestedBy")
+  approvals         Approval[]         @relation("ApprovalDecidedBy")
+  templateVersions  TemplateVersion[]  @relation("TemplateVersionCreatedBy")
+  auditEvents       AuditEvent[]       @relation("AuditEventActor")
+  testRunsStarted   TestRun[]          @relation("TestRunStartedBy")
+  testCasesTested   TestCaseResult[]   @relation("TestCaseResultTestedBy")
 }
 
 model AuditEvent {
@@ -192,6 +238,7 @@ model TestCard {
   updatedAt  DateTime @updatedAt
 
   bank Bank? @relation(fields: [bankId], references: [id])
+  testCaseResults TestCaseResult[]
 
   @@index([bankId, active])
 }
@@ -266,6 +313,7 @@ model CampaignVersion {
   deployments           Deployment[]
   approvals             Approval[]
   sourceTemplateVersion TemplateVersion? @relation(fields: [sourceTemplateVersionId], references: [id])
+  testRuns              TestRun[]
 
   @@unique([campaignId, versionNumber])
   @@index([status, createdAt])
@@ -356,6 +404,9 @@ model ExecutionRun {
   requestedBy User                 @relation("RunRequestedBy", fields: [requestedById], references: [id])
   operations  ExecutionOperation[]
   approvals   Approval[]
+  resetForTestRuns   TestRun[] @relation("TestRunResetRun")
+  buildForTestRuns   TestRun[] @relation("TestRunBuildRun")
+  cleanupForTestRuns TestRun[] @relation("TestRunCleanupRun")
 
   @@index([status, nextAttemptAt, queuedAt])
   @@index([lockKey, status])
@@ -407,4 +458,63 @@ model Approval {
   decidedBy       User            @relation("ApprovalDecidedBy", fields: [decidedById], references: [id])
 
   @@index([executionRunId, planHash, revokedAt])
+}
+
+/// Ensayo de laboratorio SDK (08_SDK_VALIDATION_LAB.md): un checkpoint lógico
+/// (antes/durante/después) de una `CampaignVersion`, materializado de verdad en
+/// la cuenta sandbox descartable. `environment` siempre es SANDBOX (TIME-006,
+/// SDK-001): no existe ninguna ruta que acepte otro valor como input.
+model TestRun {
+  id                String                   @id @default(cuid())
+  campaignVersionId String
+  environment       Environment
+  logicalCheckpoint TestRunLogicalCheckpoint
+  segmentIndex      Int?
+  dateShiftSeconds  Int
+  status            TestRunStatus            @default(PENDING)
+  lockKey           String
+  resetRunId        String?
+  buildRunId        String?
+  cleanupRunId      String?
+  cleanupStatus     TestRunCleanupStatus     @default(NOT_STARTED)
+  testedHash        String
+  startedById       String
+  startedAt         DateTime                 @default(now())
+  completedAt       DateTime?
+  failureReason     String?
+
+  campaignVersion CampaignVersion  @relation(fields: [campaignVersionId], references: [id])
+  startedBy       User             @relation("TestRunStartedBy", fields: [startedById], references: [id])
+  resetRun        ExecutionRun?    @relation("TestRunResetRun", fields: [resetRunId], references: [id])
+  buildRun        ExecutionRun?    @relation("TestRunBuildRun", fields: [buildRunId], references: [id])
+  cleanupRun      ExecutionRun?    @relation("TestRunCleanupRun", fields: [cleanupRunId], references: [id])
+  caseResults     TestCaseResult[]
+
+  @@index([lockKey, status])
+  @@index([campaignVersionId])
+}
+
+/// Un caso concreto de la matriz de un `TestRun` (08_SDK_VALIDATION_LAB.md §5/§7):
+/// un tramo, un monto representativo y la tarjeta de prueba correspondiente.
+model TestCaseResult {
+  id                   String               @id @default(cuid())
+  testRunId            String
+  scope                TestCaseScope
+  bankId               String?
+  rangeIndex           Int
+  amount               String
+  amountLabel          TestCaseAmountLabel
+  testCardId           String?
+  expectedInstallments Json
+  observedInstallments Json?
+  result               TestCaseResultStatus @default(PENDING)
+  justification        String?
+  testedById           String?
+  testedAt             DateTime?
+
+  testRun  TestRun   @relation(fields: [testRunId], references: [id])
+  testCard TestCard? @relation(fields: [testCardId], references: [id])
+  testedBy User?     @relation("TestCaseResultTestedBy", fields: [testedById], references: [id])
+
+  @@index([testRunId, result])
 }

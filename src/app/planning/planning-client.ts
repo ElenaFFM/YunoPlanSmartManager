@@ -211,6 +211,133 @@ export function importKnownRemotePlans(userId: string, planIds: string[]) {
   });
 }
 
+export type LogicalCheckpoint = "BEFORE" | "DURING" | "AFTER";
+
+export type RequestedCheckpoint =
+  | { checkpoint: "BEFORE" }
+  | { checkpoint: "AFTER" }
+  | { checkpoint: "DURING"; segmentIndex: number };
+
+export type RequiredCheckpointJson = {
+  checkpoint: LogicalCheckpoint;
+  segmentIndex?: number;
+  instant: string | null;
+  notApplicableReason?: string;
+};
+
+export type PlannedCaseJson = {
+  scope: "AMEX" | "BANK" | "GENERAL";
+  bankId?: string;
+  rangeIndex: number;
+  amountLabel: "MIN" | "MAX" | "INTERIOR" | "ADJACENT_BELOW_MIN" | "ADJACENT_ABOVE_MAX";
+  amount: string;
+  testCardId: string | null;
+  expectedInstallments: number[];
+};
+
+export type PlannedCheckpointJson = {
+  checkpoint: RequiredCheckpointJson;
+  cases: PlannedCaseJson[];
+  findings: ValidationFinding[];
+};
+
+export type TestCaseResultStatus = "PENDING" | "PASSED" | "FAILED" | "NOT_APPLICABLE";
+
+export type TestCaseResult = {
+  id: string;
+  testRunId: string;
+  scope: "AMEX" | "BANK" | "GENERAL";
+  bankId: string | null;
+  rangeIndex: number;
+  amount: string;
+  amountLabel: PlannedCaseJson["amountLabel"];
+  testCardId: string | null;
+  expectedInstallments: number[];
+  observedInstallments: number[] | null;
+  result: TestCaseResultStatus;
+  justification: string | null;
+  testedAt: string | null;
+};
+
+export type TestRunStatus =
+  | "PENDING"
+  | "RESETTING"
+  | "BUILDING"
+  | "READY"
+  | "RECORDING"
+  | "COMPLETED"
+  | "FAILED"
+  | "ABORTED";
+
+export type TestRun = {
+  id: string;
+  campaignVersionId: string;
+  logicalCheckpoint: LogicalCheckpoint;
+  segmentIndex: number | null;
+  status: TestRunStatus;
+  cleanupStatus: "NOT_STARTED" | "CLEANED" | "RESIDUAL";
+  startedAt: string;
+  completedAt: string | null;
+  failureReason: string | null;
+  caseResults: TestCaseResult[];
+  resetRun?: { id: string; status: string } | null;
+  buildRun?: { id: string; status: string } | null;
+  cleanupRun?: { id: string; status: string } | null;
+};
+
+export type TestGateCheckpointStatus = {
+  checkpoint: LogicalCheckpoint;
+  segmentIndex?: number;
+  satisfied: boolean;
+  reason?: "NOT_APPLICABLE";
+  testRunId?: string;
+};
+
+export type TestGateStatus = {
+  campaignId: string;
+  campaignVersionId: string;
+  canonicalHash: string;
+  satisfied: boolean;
+  checkpoints: TestGateCheckpointStatus[];
+};
+
+/** Matriz de casos por checkpoint, sin persistir nada. */
+export function planTestMatrix(userId: string, campaignId: string) {
+  return apiFetch<PlannedCheckpointJson[]>(userId, `/api/planning/campaigns/${campaignId}/test-matrix`);
+}
+
+/** Arranca un ensayo real: reinicializa sandbox y crea el baseline + los planes de este checkpoint. */
+export function startTestRun(userId: string, campaignId: string, checkpoint: RequestedCheckpoint) {
+  return apiFetch<TestRun>(userId, "/api/planning/test-runs", {
+    method: "POST",
+    body: JSON.stringify({ campaignId, checkpoint }),
+  });
+}
+
+export function getTestRunProgress(userId: string, testRunId: string) {
+  return apiFetch<TestRun>(userId, `/api/planning/test-runs/${testRunId}`);
+}
+
+export function recordTestCaseResult(
+  userId: string,
+  testRunId: string,
+  caseId: string,
+  input: { observedInstallments: number[]; result: TestCaseResultStatus; justification?: string },
+) {
+  return apiFetch<TestCaseResult>(userId, `/api/planning/test-runs/${testRunId}/cases/${caseId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function completeTestRun(userId: string, testRunId: string) {
+  return apiFetch<TestRun>(userId, `/api/planning/test-runs/${testRunId}/complete`, { method: "POST" });
+}
+
+export function getTestGateStatus(userId: string, campaignId: string) {
+  return apiFetch<TestGateStatus>(userId, `/api/planning/campaigns/${campaignId}/test-gate`);
+}
+
 export function classifyRemotePlan(
   userId: string,
   remotePlanId: string,

@@ -15,8 +15,9 @@ El repositorio está en desarrollo. La documentación funcional y técnica vive 
 - CI en GitHub Actions (lint, typecheck, tests y build en cada push/PR a `main`).
 - Registro remoto sandbox (Fase 5): importación idempotente de planes visibles y por IDs conocidos, clasificación/reconciliación auditada y UI en `/planning/remotos`.
 - Ejecutor sandbox (Fase 6, MVP): planificador comercial que genera y encola planes de ejecución desde una campaña; progreso disponible desde `/planning/campanas`.
-- Migraciones de catálogo y `RemotePlan` aplicadas en la PostgreSQL de pruebas; integración de catálogo, campañas, catálogo de alcances, queue, planificador y worker verificadas.
-- Pendientes: laboratorio SDK sin pagos (Fase 7), aprobación y despliegue productivo (Fase 8), autenticación productiva e infraestructura/observabilidad de despliegue.
+- Laboratorio SDK (Fase 7): checkpoints lógicos (antes/durante/después), matriz de casos por tramo/monto/tarjeta, reinicialización real de la cuenta sandbox a un baseline conocido y creación de los planes del checkpoint (reusando el ejecutor de Fase 6), registro manual de cuotas observadas y gate `SDK-001` a `SDK-009` (informativo) en `/planning/laboratorio-sdk`.
+- Migraciones de catálogo, `RemotePlan` y `TestRun`/`TestCaseResult` aplicadas en la PostgreSQL de pruebas; integración de catálogo, campañas, catálogo de alcances, queue, planificador y worker verificadas.
+- Pendientes: tarjetas de prueba reales para destrabar el gate del laboratorio SDK, prueba de integración automatizada del flujo del laboratorio, aprobación y despliegue productivo (Fase 8), autenticación productiva e infraestructura/observabilidad de despliegue.
 
 ## Requisitos
 
