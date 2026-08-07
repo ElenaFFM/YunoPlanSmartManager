@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, apiFetchWithMeta, ApiError } from "@/lib/api";
 
 export type CatalogStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 export type IinStatus = "ACTIVE" | "INACTIVE";
@@ -171,6 +171,30 @@ export type AuditEvent = {
   actor: { id: string; displayName: string; email: string } | null;
 };
 
-export function listAuditEvents(userId: string) {
-  return apiFetch<AuditEvent[]>(userId, "/api/audit/events");
+export type AuditEventFilters = {
+  entityType?: string;
+  action?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AuditEventsPage = {
+  events: AuditEvent[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export function listAuditEventsPage(userId: string, filters: AuditEventFilters = {}): Promise<AuditEventsPage> {
+  const query = new URLSearchParams();
+  if (filters.entityType) query.set("entityType", filters.entityType);
+  if (filters.action) query.set("action", filters.action);
+  if (filters.page) query.set("page", String(filters.page));
+  if (filters.pageSize) query.set("pageSize", String(filters.pageSize));
+  const queryString = query.toString();
+
+  return apiFetchWithMeta<AuditEvent[], { total: number; page: number; pageSize: number }>(
+    userId,
+    `/api/audit/events${queryString ? `?${queryString}` : ""}`,
+  ).then(({ data, meta }) => ({ events: data, total: meta.total, page: meta.page, pageSize: meta.pageSize }));
 }

@@ -10,7 +10,9 @@ Este documento es la fuente única de verdad del sistema de diseño del rediseñ
 
 **Etapa 3 (kit de UI completo) cerrada** — verificado en vivo en `/dev/ui` (interacción real: ConfirmDialog con confirmación reforzada, cambio de tabs) más typecheck/lint/149 tests/build en verde.
 
-**Etapa 4 (piloto: Auditoría) es la siguiente.**
+**Etapa 4 (piloto: Auditoría) cerrada** — primera página real migrada al kit nuevo, con las brechas de `04_UX_AND_WORKFLOWS.md` §8 cerradas: filtros server-side (entidad, acción), paginación real (`GET /api/audit/events?entityType=&action=&page=&pageSize=`, con `where`+`count` en Prisma en vez del límite fijo de 200 filas que había antes) y exportación a CSV de la página actual. Verificado en vivo: filtro por "Campaign" recorta correctamente la tabla, exportar CSV no lanza errores. `catalog-client.ts` gana `listAuditEventsPage` (reemplaza el `listAuditEvents` sin filtros) y `src/lib/api/fetch.ts` gana `apiFetchWithMeta` para endpoints que devuelven `meta` de paginación además de `data`.
+
+**Etapa 5 (Catálogo: tarjetas → bancos → plantillas) es la siguiente.**
 
 ## AppShell y navegación
 
