@@ -22,6 +22,36 @@ function normalizeTimestamp(value: unknown): unknown {
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
+/**
+ * Compara recursivamente tratando como iguales dos strings de fecha que
+ * representan el mismo instante en formatos distintos (p. ej. Yuno le quita
+ * los milisegundos y a veces el offset a lo que se envió). Sin esto, cualquier
+ * `UPDATE` que toque `availability` falla la verificación post-escritura
+ * aunque Yuno haya aplicado exactamente lo pedido — comparar con
+ * `JSON.stringify` dos strings ISO del mismo instante pero distinto formato
+ * nunca da igual.
+ */
+export function valuesMatchNormalizingTimestamps(expected: unknown, actual: unknown): boolean {
+  if (typeof expected === "string" && typeof actual === "string") {
+    return normalizeTimestamp(expected) === normalizeTimestamp(actual);
+  }
+  if (Array.isArray(expected) && Array.isArray(actual)) {
+    return (
+      expected.length === actual.length &&
+      expected.every((value, index) => valuesMatchNormalizingTimestamps(value, actual[index]))
+    );
+  }
+  if (expected && actual && typeof expected === "object" && typeof actual === "object") {
+    return Object.keys(expected as Record<string, unknown>).every((key) =>
+      valuesMatchNormalizingTimestamps(
+        (expected as Record<string, unknown>)[key],
+        (actual as Record<string, unknown>)[key],
+      ),
+    );
+  }
+  return expected === actual;
+}
+
 /** El hash cubre toda la respuesta remota, no solo su timestamp de actualización. */
 export function computeRemotePlanResponseHash(plan: unknown): string {
   if (!plan || typeof plan !== "object" || Array.isArray(plan)) {

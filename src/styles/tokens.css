@@ -1,0 +1,156 @@
+/**
+ * Fuente única de valores de diseño. Ningún color hexadecimal debería
+ * aparecer fuera de este archivo (excepción: legacy.css, que se retira
+ * en la Etapa 10). Ver docs/planning/16_DESIGN_SYSTEM.md.
+ */
+:root {
+  color-scheme: light;
+
+  /* Neutrales — rampa derivada de la paleta actual */
+  --neutral-0: #ffffff;
+  --neutral-50: #f8faf8;
+  --neutral-100: #f5f4ef;
+  --neutral-200: #ece7e7;
+  --neutral-300: #dce3dd;
+  --neutral-400: #c7cfc9;
+  --neutral-500: #9aa39c;
+  --neutral-600: #647069;
+  --neutral-700: #47524c;
+  --neutral-800: #2c352f;
+  --neutral-900: #1c2520;
+
+  /* Semánticos de superficie/texto/borde */
+  --bg-page: var(--neutral-100);
+  --bg-surface: var(--neutral-0);
+  --bg-raised: var(--neutral-0);
+  --bg-sunken: var(--neutral-50);
+  --fg-default: var(--neutral-900);
+  --fg-muted: var(--neutral-600);
+  --fg-subtle: var(--neutral-500);
+  --border-subtle: var(--neutral-200);
+  --border-default: var(--neutral-300);
+  --border-strong: var(--neutral-400);
+
+  /* Acento — se conserva el verde actual, sin branding nuevo */
+  --accent-50: #eaf6f0;
+  --accent-100: #dcefe6;
+  --accent-500: #136f52;
+  --accent-600: #0f5c43;
+  --accent-700: #0c4735;
+  --accent-fg: #ffffff;
+  --accent-ring: rgba(19, 111, 82, 0.45);
+
+  /* Intenciones — mapeadas 1:1 a la taxonomía de 09_SECURITY_AND_APPROVALS.md §7 */
+  --danger-bg: #fbeceb;
+  --danger-border: #e3a8a2;
+  --danger-fg: #a3312a;
+  --warning-bg: #f2e9d8;
+  --warning-border: #d9be86;
+  --warning-fg: #8a6a1f;
+  --success-bg: #dcefe6;
+  --success-border: #9fcdb8;
+  --success-fg: #136f52;
+  --info-bg: #e9eff9;
+  --info-border: #b7c8e8;
+  --info-fg: #2c5c9e;
+  --pending-bg: #ece7e7;
+  --pending-border: #cfc8c8;
+  --pending-fg: #647069;
+
+  /* Ambiente — nunca solo color, siempre acompañado de patrón */
+  --env-sandbox-fg: #2c5c9e;
+  --env-sandbox-bg: #e9eff9;
+  --env-sandbox-pattern: repeating-linear-gradient(
+    45deg,
+    rgba(44, 92, 158, 0.12) 0 4px,
+    transparent 4px 8px
+  );
+  --env-production-fg: #a3312a;
+  --env-production-bg: #fbeceb;
+  --env-production-pattern: repeating-linear-gradient(
+    45deg,
+    rgba(163, 49, 42, 0.16) 0 4px,
+    transparent 4px 8px
+  );
+  --env-rehearsal-fg: #8a6a1f;
+  --env-rehearsal-bg: #f2e9d8;
+  --env-rehearsal-pattern: repeating-linear-gradient(
+    45deg,
+    rgba(138, 106, 31, 0.14) 0 4px,
+    transparent 4px 8px
+  );
+
+  /* Alcance — color por nivel para el Gantt y las etiquetas de campaña */
+  --scope-general: #407dce;
+  --scope-bank: var(--accent-500);
+  --scope-amex: #9a5eb7;
+  --scope-restriction: #c77b3f;
+  --scope-specific-day: #647069;
+
+  /* Intensidad por estado del Gantt (alpha aplicado sobre el color de alcance) */
+  --state-draft-alpha: 0.35;
+  --state-tested-alpha: 0.55;
+  --state-approved-alpha: 0.75;
+  --state-active-alpha: 1;
+  --state-finished-alpha: 0.3;
+
+  /* Espaciado — base 4px */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Tipografía */
+  --font-sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.4rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.2rem;
+  --leading-tight: 1.15;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --weight-regular: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
+
+  /* Radios, elevación, capas */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(28, 37, 32, 0.08);
+  --shadow-md: 0 4px 12px rgba(28, 37, 32, 0.12);
+  --z-dropdown: 20;
+  --z-sticky: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+
+  /* Foco visible — requisito de accesibilidad, hoy inexistente */
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent-ring);
+
+  /* --- Alias de compatibilidad con las 6 variables originales de globals.css ---
+     legacy.css sigue funcionando sin tocarlo mientras cada página migra. */
+  --background: var(--bg-page);
+  --surface: var(--bg-surface);
+  --foreground: var(--fg-default);
+  --muted: var(--fg-muted);
+  --accent: var(--accent-500);
+  --border: var(--border-default);
+}
+
+/* Breakpoints de referencia (las custom properties no funcionan dentro de
+   @media; se documentan acá y en docs/planning/16_DESIGN_SYSTEM.md):
+   --bp-sm: 40rem, --bp-md: 60rem, --bp-lg: 80rem */

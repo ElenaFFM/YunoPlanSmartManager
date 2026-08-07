@@ -4,7 +4,7 @@ El roadmap usa fases con criterios de salida, no fechas arbitrarias. Las estimac
 
 ## Estado de implementación
 
-**Última actualización:** 6 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real)
+**Última actualización:** 7 de agosto de 2026 (Fase 2 completa; audit writer y CI de Fase 1; spike y contract test de Yuno; Fase 3 cerrada con el motor de dominio, campañas versionadas en base, lectura de la configuración efectiva desde el catálogo real, generación de casos SDK y API HTTP + UI de campañas; auditoría de requerimientos con tres correcciones aplicadas; Fase 6 cerrada para su MVP con create/update/delete/verify, compensaciones, inyección de fallos y el planificador comercial que decide qué encolar a partir de una campaña real; Fase 7 con `TestRun`/`TestCaseResult`, checkpoints lógicos, gate `SDK-001`-`SDK-009` y reinicialización real de sandbox reusando el worker de Fase 6, verificado en vivo; **ampliación de Fase 4 iniciada** — rediseño integral de la UI de toda la aplicación en 10 etapas, Etapa 1 de fundaciones cerrada, ver el detalle dentro de la Fase 4 más abajo)
 
 Este documento es la fuente única para seguir el avance. `[x]` indica terminado y verificado; `[ ]` indica pendiente. Cuando una capacidad está iniciada pero no completa, se divide en resultados terminados y pendientes.
 
@@ -16,7 +16,7 @@ Este documento es la fuente única para seguir el avance. `[x]` indica terminado
 | Catálogo | Fase 2 completa: bancos, BINs, plantillas (`GENERAL`/`BANK`/`AMEX`, con versionado inmutable) y tarjetas de prueba, con altas, edición, desactivación/archivo e interfaz mínima. |
 | Auditoría | Todas las mutaciones del catálogo y de campañas generan un `AuditEvent` transaccional, visible en `/catalog/auditoria`. Auditoría de ejecuciones pendiente de que existan. |
 | Identidad | Tres roles fijos implementados. Identidad temporal disponible sólo en desarrollo/test; proveedor real pendiente. |
-| Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico, invalidación por versión y generación de casos SDK. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). API HTTP y UI en `/planning/campanas` ya expuestas; falta la transición `DRAFT`→`VALIDATED` (Fase 7/8). |
+| Motor de dominio | Piezas puras y testeadas: transformaciones de cuotas, proyección temporal, prioridad entre alcances, diff antes/durante/después, validación de catálogo y de campaña, hash canónico, invalidación por versión y generación de casos SDK. Conectado a persistencia en ambos sentidos: campañas versionadas (escritura) y catálogo de alcances desde el catálogo real (lectura, con endpoint). API HTTP y UI en `/planning/campanas` ya expuestas, incluida la transición `DRAFT`→`VALIDATED` (ver abajo) — el gate de producción (checklist, laboratorio SDK, aprobación) sigue siendo Fase 7/8. |
 | Yuno | Contract test manual verificado contra sandbox (`npm run test:contract:yuno`) usando el cliente HTTP propio, más `npm run test:contract:execution-worker` para el ejecutor completo (create/update/verify/delete). El planificador comercial ya decide qué operaciones encolar a partir de una campaña real (MVP: una campaña a la vez, sin mezclar con otras `VALIDATED`), vía `POST /api/planning/campaigns/:id/sandbox-deployment`. |
 
 Hitos ya versionados: fundación (`a29bb47`, `e6219cf`, `f96d4fd`), queue durable (`83de4c5`) y catálogo (`248749f`, `a2f010f`, `ea52811`).
@@ -115,8 +115,15 @@ Puede representarse la configuración comercial sin llamar a Yuno.
 - [ ] Property-based tests con librería dedicada (por ahora los invariantes de contigüidad se prueban con casos concretos, sin agregar dependencias nuevas).
 - [x] Hash canónico reutilizable (`computeCanonicalHash`, `src/modules/planning/domain/canonical-hash.ts`) para `CampaignVersion.canonicalHash`.
 - [x] API HTTP y UI de campañas: `GET/POST /api/planning/campaigns` y `GET/PATCH /api/planning/campaigns/[id]` (`src/app/api/planning/campaigns/`) exponen `createCampaign`/`updateCampaignConfiguration`/`getCampaign` (ya existentes) más un `listCampaigns` nuevo; autorización de lectura `VIEWER|OPERATOR|ADMIN`, escritura `OPERATOR|ADMIN` (`09_SECURITY_AND_APPROVALS.md` §2 — a diferencia del catálogo, que es solo `ADMIN`). El body se valida reexportando `campaignSegmentSchema` de `campaign-snapshot.ts` en un schema nuevo de `planning-http.ts`, separado de `parseCampaignSegments` (pensado para snapshots ya guardados, no para el body de un request). UI nueva bajo `/planning/campanas` (`layout.tsx` reusa `IdentityProvider`/`IdentityBadge` del catálogo por cross-import) con alta, edición versionada y un editor de segmentos/tramos por campaña, siguiendo el mismo patrón que `catalog/plantillas`. Verificado de punta a punta contra el dev server: alta, cambio cosmético (sin nueva versión), cambio material (nueva versión, aquí sin aprobaciones que revocar), `rangeIndex` inválido rechazado con `CMP-007` legible en la UI, y vigencia indefinida sin confirmar mostrando el `WARNING CMP-004` no bloqueante.
-  - **Decisión (confirmada con el usuario):** esta iteración no agrega una transición `DRAFT`→`VALIDATED`. Las campañas creadas quedan en `DRAFT` y no afectan `effective-configuration` salvo con `includeDrafts=true` — los gates reales (checklist, laboratorio SDK, aprobación) son de Fase 7/8 y todavía no existen; agregar un atajo ahora expondría un salto sin los controles que el dominio no tiene aún.
+  - **Decisión revisada (2026-08-06):** la transición `DRAFT`→`VALIDATED` ya está implementada (ver el punto dedicado más abajo), acotada a lo que el código controla hoy — no reemplaza el gate de producción de Fase 7/8, que sigue sin existir.
   - Sin DELETE, igual que el catálogo: el dominio de campañas no tiene esa operación, solo transiciones/versiones.
+- [x] `CMP-013` — transformación que no altera el set de cuotas vigente (`src/modules/planning/domain/campaign.ts`): `validateCampaignConfiguration` acepta un `TargetRangeBaselines` opcional (set de cuotas por alcance/tramo antes de la campaña) y compara el resultado de aplicar la transformación contra ese baseline; si coinciden, agrega un `WARNING` no bloqueante. `campaign-service.ts` lo llena consultando `loadBaselineInstallmentsByTarget` (`scope-catalog-builder.ts`), igual patrón que `CMP-007`/`loadRangeIndexesByTarget`. `RESTORE_BASELINE` queda afuera del chequeo a propósito: por definición siempre coincide con el baseline, y eso es su propósito, no un error de carga.
+  - Corrige un hallazgo detectado probando el flujo manualmente: `CAP_MAX_INSTALLMENT` solo *quita* opciones por encima de un máximo — nunca agrega — así que pedir "capar a 24" sobre un baseline que ya tope en 9 no hace nada, y antes de esta validación el sistema lo guardaba y hasta lo desplegaba sin avisar. Para agregar cuotas más largas corresponde `ADD_EXACT_INSTALLMENTS`, no `CAP_MAX_INSTALLMENT` (documentado también en `02_DOMAIN_MODEL_AND_RULES.md` §4).
+- [x] Transición `DRAFT`→`VALIDATED` (`validateCampaignVersion`, `campaign-service.ts`; `POST /api/planning/campaigns/:id/validate`, `OPERATOR`/`ADMIN`; botón "Validar campaña" en `/planning/campanas`, solo mientras la versión actual es `DRAFT`). **Alcance deliberadamente acotado:** esto no es el gate de producción (checklist comercial, laboratorio SDK, `Approval` — Fase 7/8, todavía inexistentes). Lo único que controla hoy es si la campaña cuenta en `buildScopeCatalog`/`effective-configuration` (que por defecto solo lee `VALIDATED`, así que hasta ahora *ninguna* campaña real afectaba esa lectura) y si queda protegida contra solapamientos con otras campañas `VALIDATED` sobre el mismo alcance/tramo.
+  - Validar es más estricto que guardar un borrador: `assertValidConfiguration` ahora acepta `{ strict: true }`, que trata también los `WARNING` (no solo los `ERROR`) como bloqueantes — por ejemplo, no se puede validar con el `WARNING CMP-013` sin resolver.
+  - `assertCampaignDoesNotOverlapValidated` (`scope-catalog-builder.ts`) reutiliza `assertNoCrossCampaignOverlap` (que antes solo corría entre campañas ya cargadas por `buildScopeCatalog` para un mismo filtro de estado) contra la campaña candidata antes de confirmarla, por cada alcance/tramo que toca.
+  - Solo se puede validar una versión en `DRAFT` (`CMP-VALIDATE-001`, guarda de flujo del mismo estilo que `CMP-RUN-001`, sin entrada en `14_VALIDATION_CATALOG.md` por la misma razón que esa).
+  - Un cambio material posterior a una campaña `VALIDATED` ya la supera automáticamente a `SUPERSEDED` y crea una versión `DRAFT` nueva (mecanismo existente de `applyMaterialChange`), así que queda excluida de `effective-configuration` otra vez hasta revalidarla — no hizo falta ningún cambio ahí.
 
 ### Salida
 
@@ -124,7 +131,7 @@ Puede representarse la configuración comercial sin llamar a Yuno.
 
 Una auditoría posterior contra la documentación de requerimientos encontró tres gaps no declarados, ya corregidos y verificados con datos reales: `rangeIndex` sin validar contra el catálogo real, `InvalidScopeCatalogError` sin código estable, y superposición entre campañas distintas resuelta por orden de carga en vez de rechazada explícitamente (ver los tres puntos arriba).
 
-Fase cerrada salvo property-based tests (deliberadamente postergadas) y la transición `DRAFT`→`VALIDATED` (deliberadamente fuera de esta iteración, ver arriba).
+Fase cerrada salvo property-based tests (deliberadamente postergadas). La transición `DRAFT`→`VALIDATED` (antes deliberadamente fuera de esta iteración) ya está implementada, ver arriba.
 
 ## Fase 4: UX de planificación
 
@@ -138,6 +145,21 @@ Fase cerrada salvo property-based tests (deliberadamente postergadas) y la trans
 ### Salida
 
 Un usuario puede crear y validar un borrador complejo sin escribir JSON.
+
+### Ampliación 2026-08-07: rediseño integral de UI
+
+Lo anterior cubría solo campañas. El usuario pidió ampliar el alcance a **toda** la aplicación (catálogo, campañas, planes remotos, laboratorio SDK, auditoría) porque la interfaz actual es desordenada — la causa raíz identificada es la ausencia de una capa de componentes React compartidos, no una mezcla de frameworks de CSS. Alcance completo, decisiones de arquitectura y las 10 etapas de migración documentadas en `16_DESIGN_SYSTEM.md`. Criterio central explícito del usuario: el módulo de campañas (wizard, Gantt, configuración de promos, distinción vigente/futura/pasada) es el proceso más complejo del sistema y tiene que quedar el más amigable y claro de toda la app, no solo el más funcional.
+
+- [x] **Etapa 1 — Fundaciones invisibles:** capas de CSS (`src/styles/{tokens,reset,base,legacy}.css`), cliente API unificado (`src/lib/api/`, con `describeError` implementando los 4 niveles de notificación), formatters y mapas de etiquetas es-AR (`src/lib/format.ts`, `src/lib/labels/`). Cero cambio visual, cero páginas tocadas; verificado con typecheck, 149 tests y build en verde.
+- [x] **Etapa 2 — AppShell, navegación global y notificaciones base:** sidebar (4 grupos, secciones no construidas visibles como "Próximamente") + topbar con indicador de ambiente (`GET /api/environment`, nuevo) e identidad, reemplazando los tabs duplicados de `catalog/layout.tsx`/`planning/layout.tsx`; `GlobalNotices`/`AlertStack`. Verificado en vivo (bancos, auditoría, campañas) sin errores de consola, más typecheck/lint/149 tests/build en verde.
+- [x] **Etapa 3 — Kit de UI completo** (`src/components/ui/**`): Button, Badge/StatusBadge, Alert, Card, DataTable, Pagination, Toolbar, DefinitionList, EmptyState, Skeleton/Spinner, AsyncBoundary, Stepper, ProgressList, CodeBlock/JsonViewer, Disclosure, Modal, ConfirmDialog, Tabs. Catálogo vivo en `/dev/ui` (gated a development), verificado en vivo con interacción real.
+- [x] **Etapa 4 — Piloto: Auditoría**, con filtros server-side (entidad/acción), paginación real y exportación a CSV — antes tenía un límite fijo de 200 filas sin forma de filtrar ni paginar. Verificado en vivo contra datos reales.
+- [ ] **Etapa 5 — Catálogo** (tarjetas → bancos → plantillas), extrayendo el patrón triplicado `CreateXForm`/`XCard`.
+- [ ] **Etapa 6 — Ejecuciones:** polling unificado, `/planning/ejecuciones`, pantalla de reconciliación de operación incierta.
+- [ ] **Etapa 7 — Planes remotos** sobre `DataTable` + patrón de cola de revisión.
+- [ ] **Etapa 8 — Campañas:** split lista/detalle, wizard real de 6 pasos, tabla de confirmación de 9 columnas. Requiere `GET /api/planning/campaigns/:id/deployment-plan` de solo lectura (dependencia de backend).
+- [ ] **Etapa 9 — Calendario y Línea de tiempo (Gantt):** modelo puro testeado, alternativa tabular primero, sin drag en v1.
+- [ ] **Etapa 10 — Inicio, Administración y limpieza final:** dashboard (requiere endpoint de agregados), `/admin`, retiro de `legacy.css`, pasada de accesibilidad/responsive.
 
 ## Fase 5: Registro remoto e importación
 
@@ -174,16 +196,25 @@ Una campaña se aplica y revierte con seguridad en sandbox, incluyendo el cálcu
 
 ## Fase 7: Laboratorio SDK
 
-- integración SDK sin pagos.
-- checkpoints lógicos.
-- fechas ficticias aisladas.
-- TestRun y matriz de casos.
-- reinicialización a baseline conocido y cleanup informativo.
-- gate de pruebas.
+- [x] Lite SDK recibe la `checkout_session` del BFF, ejecuta `startCheckout` y monta `CARD` para el laboratorio, sin `startPayment` ni creacion de pagos.
+
+- [x] UI inicial de laboratorio: permite crear y validar una `checkout_session` sandbox desde datos de prueba y muestra su identificador, sin iniciar checkout ni pagos.
+- [x] Lite SDK cargado e inicializado en sandbox mediante `@yuno-payments/sdk-web` en `/planning/laboratorio-sdk`; usa SRI, requiere `OPERATOR`/`ADMIN` y no inicia checkout ni pagos.
+- [x] BFF de sesion de checkout sandbox: `POST /api/planning/sdk/checkout-sessions` crea la sesion usando `GANDALF_CHECKOUT_SESSION_URL`, solo para `OPERATOR`/`ADMIN` y con `YUNO_ENV=sandbox`. La respuesta queda sin cache y se audita sin PII. Falta recibir el contrato de respuesta/inicializacion del SDK para embeberlo y observar cuotas.
+- [x] Modelo `TestRun`/`TestCaseResult` (migración `20260806225346_test_runs`): checkpoint lógico (`BEFORE`/`DURING`/`AFTER`), `dateShiftSeconds` aislado de `CampaignVersion`, lock exclusivo (`lockKey`), referencias a los `ExecutionRun` de reset/build/cleanup y hash probado (`testedHash`) para `SDK-009`.
+- [x] Checkpoints lógicos (`src/modules/sdk-lab/domain/checkpoints.ts`): `deriveRequiredCheckpoints` deriva `BEFORE` + un `DURING` por cada `CampaignSegment` + `AFTER` (o `NOT_APPLICABLE` automático si algún segmento queda indefinido), dominio puro y testeado.
+- [x] Gate `SDK-001` a `SDK-009` (`src/modules/sdk-lab/domain/sdk-gate.ts` + `test-run-service.ts`): `SDK-001`/`SDK-007`/`SDK-008` son invariantes de flujo (ambiente forzado sandbox, baseline confirmado antes de habilitar el SDK, lock único); `SDK-002`/`SDK-003`/`SDK-004`/`SDK-006`/`SDK-009` son validaciones de dominio puro y testeadas. `GET /api/planning/campaigns/:id/test-gate` expone el estado agregado — **informativo, no bloquea** `DRAFT→VALIDATED` ni ningún despliegue; es la base para el gate de producción de Fase 8.
+- [x] Matriz de casos por checkpoint (`test-run-service.ts`, reusa `buildAmountCases` de `sdk-case-generation.ts`): por cada alcance/tramo que la campaña toca, cuotas esperadas en el instante del checkpoint + montos mínimo/máximo/interior/adyacentes + tarjeta de prueba representativa (`GET /api/planning/campaigns/:id/test-matrix`, solo lectura).
+- [x] Reinicialización real a baseline conocido y creación de los planes del checkpoint (`§4` pasos 5-7): `POST /api/planning/test-runs` reusa el `ExecutionRun`/worker de Fase 6 sin cambios — encola un run de `DELETE` (solo planes cuyo `Deployment.kind=TEST`, nunca datos reales importados ni despliegues comerciales `CANONICAL`) y un run de `CREATE` del baseline completo + los tramos del checkpoint, con nombre `[TEST]` y correlation ID (`src/modules/sdk-lab/domain/create-payload.ts`). El worker es secuencial por `queuedAt`, así que el reset termina antes de que el build se reclame.
+- [x] Registro de resultados y cierre: `PATCH /api/planning/test-runs/:id/cases/:caseId` fuerza `FAILED` ante cualquier desajuste esperado/observado (`SDK-005`) sin importar qué pidió el operador; `POST /api/planning/test-runs/:id/complete` exige todos los casos resueltos y dispara una limpieza best-effort (`§4` paso 11, informativa — nunca bloquea el cierre del ensayo).
+- [x] UI en `/planning/laboratorio-sdk`: selector de campaña, tabla de checkpoints con su estado de gate, inicio de ensayo con confirmación de dos pasos, polling de progreso, registro manual de cuotas observadas por caso (captura manual, D-029) y panel de gate.
+- [ ] Tarjetas/BIN de prueba reales para que `SDK-004` deje de bloquear: hoy no hay datos de prueba cargados, así que ningún ensayo puede arrancar hasta cargar `TestCard` para cada banco afectado desde `/catalog/tarjetas` — verificado en vivo contra la base de pruebas.
+- [ ] Prueba de integración automatizada del flujo completo (`test:integration:test-run`, con `fake-yuno-client.ts` como en `execution-worker.integration.ts`): quedó fuera de esta iteración; la cobertura actual es unitaria (`checkpoints.test.ts`, `sdk-gate.test.ts`) más la verificación manual contra el dev server y la base de pruebas real.
+- [ ] Property-based / cobertura exhaustiva de la matriz de casos (mismo criterio que Fase 3: casos concretos por ahora, sin agregar dependencias nuevas).
 
 ### Salida
 
-Antes/durante/después pueden validarse y quedan auditados.
+Antes/durante/después pueden validarse y quedan auditados: un `OPERATOR`/`ADMIN` reinicializa el sandbox descartable, corre un ensayo real por checkpoint y registra cuotas esperadas vs. observadas, con un gate informativo (`SDK-001` a `SDK-009`) que preparará el futuro gate de producción. Fase abierta: falta cargar tarjetas de prueba reales para destrabar `SDK-004` y una prueba de integración automatizada del flujo end-to-end.
 
 ## Fase 8: Aprobación y producción
 

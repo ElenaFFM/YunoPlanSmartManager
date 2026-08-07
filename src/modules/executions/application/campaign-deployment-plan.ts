@@ -189,35 +189,28 @@ function buildPairPlan(input: {
   return plan;
 }
 
-/**
- * Traduce la versión actual de una campaña a un `ExecutionPlan` real de
- * sandbox (create/update/delete), y lo encola con la misma maquinaria que ya
- * usa la verificación de solo lectura.
- *
- * Limitaciones deliberadas de este MVP (ver el plan aprobado):
- * - Compara la campaña solo contra sus propias reglas, sin mezclar otras
- *   campañas `VALIDATED` que toquen el mismo par alcance/tramo — hoy no existe
- *   ninguna campaña `VALIDATED` en el sistema, así que no es una regresión.
- * - Como mucho un plan clasificado vigente por par se recorta o retira una
- *   vez; más de uno es un error explícito, no una elección silenciosa.
- * - Nunca genera una operación que dependa de un plan creado por un `CREATE`
- *   anterior del mismo run (limitación del ejecutor, ver `execution-worker.ts`):
- *   los `CREATE` no llevan `targetRemotePlanId`, y los `UPDATE`/`DELETE` solo
- *   apuntan a planes ya clasificados antes de calcular el plan.
- */
-export async function enqueueCampaignSandboxDeployment(input: {
-  campaignId: string;
-  requestedById: string;
-  idempotencyKey: string;
-}) {
-  const duplicate = await prisma.executionRun.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-    include: { operations: { orderBy: { sequence: "asc" } } },
-  });
-  if (duplicate) return duplicate;
+type ComputedDeploymentPlan = {
+  campaign: { id: string; name: string };
+  currentVersion: { id: string; canonicalHash: string };
+  operations: Array<
+    | { type: "CREATE"; requestSnapshot: CreateInstallmentPlanInput }
+    | { type: "UPDATE"; targetRemotePlanId: string; requestSnapshot: unknown }
+    | { type: "DELETE"; targetRemotePlanId: string }
+  >;
+  existingPlanRows: Array<{ id: string; yunoPlanId: string; remoteUpdatedAt: Date; responseSnapshot: unknown }>;
+};
 
+/**
+ * Calcula qué operaciones (CREATE/UPDATE/DELETE de installment plans en Yuno)
+ * produciría desplegar la versión actual de una campaña al sandbox, sin
+ * persistir ningún `Deployment` ni encolar ningún `ExecutionRun`. Útil para
+ * previsualizar el plan antes de decidir desplegarlo de verdad.
+ *
+ * Comparte las mismas limitaciones documentadas en `enqueueCampaignSandboxDeployment`.
+ */
+export async function computeCampaignSandboxDeploymentPlan(campaignId: string): Promise<ComputedDeploymentPlan> {
   const campaign = await prisma.campaign.findUnique({
-    where: { id: input.campaignId },
+    where: { id: campaignId },
     include: { currentVersion: true },
   });
   if (!campaign?.currentVersion) {
@@ -355,8 +348,45 @@ export async function enqueueCampaignSandboxDeployment(input: {
     );
   }
 
+  return {
+    campaign: { id: campaign.id, name: campaign.name },
+    currentVersion: { id: campaign.currentVersion.id, canonicalHash: campaign.currentVersion.canonicalHash },
+    operations,
+    existingPlanRows,
+  };
+}
+
+/**
+ * Traduce la versión actual de una campaña a un `ExecutionPlan` real de
+ * sandbox (create/update/delete), y lo encola con la misma maquinaria que ya
+ * usa la verificación de solo lectura.
+ *
+ * Limitaciones deliberadas de este MVP (ver el plan aprobado):
+ * - Compara la campaña solo contra sus propias reglas, sin mezclar otras
+ *   campañas `VALIDATED` que toquen el mismo par alcance/tramo — hoy no existe
+ *   ninguna campaña `VALIDATED` en el sistema, así que no es una regresión.
+ * - Como mucho un plan clasificado vigente por par se recorta o retira una
+ *   vez; más de uno es un error explícito, no una elección silenciosa.
+ * - Nunca genera una operación que dependa de un plan creado por un `CREATE`
+ *   anterior del mismo run (limitación del ejecutor, ver `execution-worker.ts`):
+ *   los `CREATE` no llevan `targetRemotePlanId`, y los `UPDATE`/`DELETE` solo
+ *   apuntan a planes ya clasificados antes de calcular el plan.
+ */
+export async function enqueueCampaignSandboxDeployment(input: {
+  campaignId: string;
+  requestedById: string;
+  idempotencyKey: string;
+}) {
+  const duplicate = await prisma.executionRun.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    include: { operations: { orderBy: { sequence: "asc" } } },
+  });
+  if (duplicate) return duplicate;
+
+  const computed = await computeCampaignSandboxDeploymentPlan(input.campaignId);
+
   const baseSnapshotHash = computeCanonicalHash(
-    existingPlanRows.map((plan) => ({
+    computed.existingPlanRows.map((plan) => ({
       yunoPlanId: plan.yunoPlanId,
       remoteUpdatedAt: plan.remoteUpdatedAt.toISOString(),
       responseSnapshot: plan.responseSnapshot,
@@ -365,10 +395,10 @@ export async function enqueueCampaignSandboxDeployment(input: {
 
   const deployment = await prisma.deployment.create({
     data: {
-      campaignVersionId: campaign.currentVersion.id,
+      campaignVersionId: computed.currentVersion.id,
       environment: "SANDBOX",
       kind: "CANONICAL",
-      configurationHash: campaign.currentVersion.canonicalHash,
+      configurationHash: computed.currentVersion.canonicalHash,
       baseSnapshotHash,
       createdById: input.requestedById,
     },
@@ -380,10 +410,10 @@ export async function enqueueCampaignSandboxDeployment(input: {
       requestedById: input.requestedById,
       idempotencyKey: input.idempotencyKey,
       plan: {
-        configurationHash: campaign.currentVersion.canonicalHash,
+        configurationHash: computed.currentVersion.canonicalHash,
         baseSnapshotHash,
-        lockKey: `SANDBOX:campaign:${campaign.id}`,
-        operations,
+        lockKey: `SANDBOX:campaign:${computed.campaign.id}`,
+        operations: computed.operations,
       },
     });
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   assertRemotePlanMatchesExpectation,
   createRemotePlanVerificationExpectation,
   RemotePlanVerificationMismatchError,
+  valuesMatchNormalizingTimestamps,
 } from "./remote-plan-verification.ts";
 
 function plan(overrides: Partial<YunoInstallmentPlan> = {}): YunoInstallmentPlan {
@@ -60,5 +61,33 @@ describe("remote plan verification", () => {
       () => assertRemotePlanMatchesExpectation({ ...baseline, updated_at: "2026-08-06T12:02:00.000Z" }, expected),
       RemotePlanVerificationMismatchError,
     );
+  });
+});
+
+describe("valuesMatchNormalizingTimestamps", () => {
+  it("acepta el mismo instante en `availability` aunque Yuno le quite los milisegundos", () => {
+    const expected = { availability: { start_at: "2026-01-01T03:00:00.000Z", finish_at: "2026-08-01T03:00:00.000Z" } };
+    const actual = { availability: { start_at: "2026-01-01T03:00:00Z", finish_at: "2026-08-01T03:00:00Z" } };
+
+    assert.equal(valuesMatchNormalizingTimestamps(expected, actual), true);
+  });
+
+  it("rechaza un instante realmente distinto", () => {
+    const expected = { availability: { finish_at: "2026-08-01T03:00:00.000Z" } };
+    const actual = { availability: { finish_at: "2026-08-02T03:00:00Z" } };
+
+    assert.equal(valuesMatchNormalizingTimestamps(expected, actual), false);
+  });
+
+  it("compara campos que no son fechas por igualdad estricta", () => {
+    assert.equal(valuesMatchNormalizingTimestamps({ name: "Plan A" }, { name: "Plan A" }), true);
+    assert.equal(valuesMatchNormalizingTimestamps({ name: "Plan A" }, { name: "Plan B" }), false);
+  });
+
+  it("ignora claves que actual tiene de más y expected no pide", () => {
+    const expected = { availability: { finish_at: "2026-08-01T03:00:00.000Z" } };
+    const actual = { availability: { start_at: "2026-01-01T03:00:00Z", finish_at: "2026-08-01T03:00:00Z" } };
+
+    assert.equal(valuesMatchNormalizingTimestamps(expected, actual), true);
   });
 });

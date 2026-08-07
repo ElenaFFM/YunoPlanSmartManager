@@ -17,6 +17,7 @@ const serverEnvironmentSchema = z
     YUNO_PUBLIC_API_KEY: z.string().min(1).optional(),
     YUNO_PRIVATE_SECRET_KEY: z.string().min(1).optional(),
     YUNO_CONTRACT_TEST_ACCOUNT_ID: z.string().min(1).optional(),
+    GANDALF_CHECKOUT_SESSION_URL: z.string().url().optional(),
   })
   .superRefine((environment, context) => {
     if (environment.APP_ENV !== "production" && environment.YUNO_ENV === "production") {
@@ -46,6 +47,31 @@ export type YunoContractTestCredentials = {
   privateSecretKey: string;
   accountId: string;
 };
+
+/** URL server-side del BFF que crea sesiones para el laboratorio SDK. */
+export type GandalfCheckoutSessionConfig = {
+  url: string;
+};
+
+export function getGandalfCheckoutSessionConfig(
+  environment: ServerEnvironment = getServerEnvironment(),
+): GandalfCheckoutSessionConfig {
+  if (!environment.GANDALF_CHECKOUT_SESSION_URL) {
+    throw new Error("Falta GANDALF_CHECKOUT_SESSION_URL para crear sesiones de checkout sandbox.");
+  }
+
+  return { url: environment.GANDALF_CHECKOUT_SESSION_URL };
+}
+
+/** La clave publica se entrega al navegador solo para inicializar el SDK sandbox. */
+export function getYunoSdkPublicApiKey(
+  environment: ServerEnvironment = getServerEnvironment(),
+): string {
+  if (!environment.YUNO_PUBLIC_API_KEY) {
+    throw new Error("Falta YUNO_PUBLIC_API_KEY para inicializar el SDK de Yuno.");
+  }
+  return environment.YUNO_PUBLIC_API_KEY;
+}
 
 /** Credenciales sandbox compartidas por los contract tests y por importaciones de solo lectura. */
 export function getYunoSandboxCredentials(

@@ -1,0 +1,75 @@
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+  width: 15rem;
+}
+
+.nav.collapsed {
+  align-items: center;
+  width: 3.75rem;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.groupLabel {
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  margin: 0 var(--space-2) var(--space-1);
+  text-transform: uppercase;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  border-radius: var(--radius-sm);
+  color: var(--fg-default);
+  display: block;
+  font-size: var(--text-sm);
+  padding: 0.45rem var(--space-3);
+  text-decoration: none;
+}
+
+.item:hover {
+  background: var(--bg-sunken);
+}
+
+.active {
+  background: var(--accent-100);
+  color: var(--accent-700);
+  font-weight: var(--weight-medium);
+}
+
+.itemDisabled {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--fg-subtle);
+  display: flex;
+  font-size: var(--text-sm);
+  justify-content: space-between;
+  padding: 0.45rem var(--space-3);
+}
+
+.soon {
+  font-size: var(--text-xs);
+}
+
+.collapsed .groupLabel,
+.collapsed .itemLabel {
+  display: none;
+}

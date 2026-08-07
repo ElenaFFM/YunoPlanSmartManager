@@ -191,6 +191,32 @@ export async function loadRangeIndexesByTarget(
   return result;
 }
 
+/**
+ * Set de cuotas vigente por alcance y tramo según la plantilla activa. Se usa
+ * para CMP-013 (detectar transformaciones que no cambian nada respecto del
+ * baseline). Mismo criterio de "alcance sin plantilla activa se omite" que
+ * `loadRangeIndexesByTarget`.
+ */
+export async function loadBaselineInstallmentsByTarget(
+  targets: readonly CampaignTarget[],
+): Promise<Map<string, Map<number, ReturnType<typeof createInstallmentSet>>>> {
+  const templates = await loadActiveTemplates();
+  const result = new Map<string, Map<number, ReturnType<typeof createInstallmentSet>>>();
+
+  for (const target of targets) {
+    const template = resolveTemplateForTarget(templates, target);
+    if (!template) continue;
+
+    const byRange = new Map<number, ReturnType<typeof createInstallmentSet>>();
+    for (const range of template.ranges) {
+      byRange.set(range.index, createInstallmentSet(range.installments));
+    }
+    result.set(campaignTargetKey(target), byRange);
+  }
+
+  return result;
+}
+
 type RuleContribution = { campaignId: string; rule: TemporalRule };
 
 /** Mismo criterio de intervalo semiabierto que `timeline.ts`/`campaign.ts`. */
@@ -228,6 +254,58 @@ function assertNoCrossCampaignOverlap(
           `sobre el tramo ${rangeIndex} de "${campaignTargetKey(target)}".`,
       );
     }
+  }
+}
+
+/** Alcance/tramo distintos que una configuración toca, sin duplicados. */
+function collectTouchedPairs(
+  configuration: CampaignConfiguration,
+): readonly { target: CampaignTarget; rangeIndex: number }[] {
+  const byKey = new Map<string, { target: CampaignTarget; rangeIndex: number }>();
+  for (const segment of configuration.segments) {
+    for (const rangeChange of segment.rangeChanges) {
+      const key = `${campaignTargetKey(segment.target)}:${rangeChange.rangeIndex}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, { target: segment.target, rangeIndex: rangeChange.rangeIndex });
+      }
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Valida que una campaña candidata a `VALIDATED` no se superponga, sobre
+ * ningún alcance/tramo que toque, con otra campaña ya `VALIDATED` —
+ * `assertNoCrossCampaignOverlap` ya hace exactamente este chequeo, pero hasta
+ * ahora solo corría entre campañas que `buildScopeCatalog` ya había cargado
+ * para un mismo filtro de estado; nunca contra una campaña que todavía no es
+ * `VALIDATED`. `excludeCampaignId` es la propia campaña candidata (para no
+ * compararla con una versión anterior suya que ya estuviera `VALIDATED`).
+ */
+export async function assertCampaignDoesNotOverlapValidated(
+  excludeCampaignId: string,
+  configuration: CampaignConfiguration,
+): Promise<void> {
+  const others = await loadCampaigns([CampaignVersionStatus.VALIDATED]);
+  const touchedPairs = collectTouchedPairs(configuration);
+
+  for (const pair of touchedPairs) {
+    const contributions: RuleContribution[] = [
+      ...buildTemporalRules(configuration, pair.target, pair.rangeIndex).map((rule) => ({
+        campaignId: excludeCampaignId,
+        rule,
+      })),
+      ...others
+        .filter((campaign) => campaign.campaignId !== excludeCampaignId)
+        .flatMap((campaign) =>
+          buildTemporalRules(campaign.configuration, pair.target, pair.rangeIndex).map((rule) => ({
+            campaignId: campaign.campaignId,
+            rule,
+          })),
+        ),
+    ];
+
+    assertNoCrossCampaignOverlap(pair.target, pair.rangeIndex, contributions);
   }
 }
 

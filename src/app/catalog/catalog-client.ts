@@ -1,3 +1,5 @@
+import { apiFetch, apiFetchWithMeta, ApiError } from "@/lib/api";
+
 export type CatalogStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 export type IinStatus = "ACTIVE" | "INACTIVE";
 
@@ -55,37 +57,8 @@ export type TestCard = {
   active: boolean;
 };
 
-export class CatalogApiError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.name = "CatalogApiError";
-    this.status = status;
-    this.code = code;
-  }
-}
-
-async function apiFetch<T>(userId: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      "x-yuno-user-id": userId,
-      ...init?.headers,
-    },
-  });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new CatalogApiError(
-      response.status,
-      body?.error?.code ?? "UNKNOWN",
-      body?.error?.message ?? "No se pudo completar la operación.",
-    );
-  }
-  return body.data as T;
-}
+/** @deprecated Alias de ApiError durante la migración (ver src/lib/api). Usar ApiError directamente en código nuevo. */
+export const CatalogApiError = ApiError;
 
 export function listBanks(userId: string) {
   return apiFetch<Bank[]>(userId, "/api/catalog/banks");
@@ -198,6 +171,30 @@ export type AuditEvent = {
   actor: { id: string; displayName: string; email: string } | null;
 };
 
-export function listAuditEvents(userId: string) {
-  return apiFetch<AuditEvent[]>(userId, "/api/audit/events");
+export type AuditEventFilters = {
+  entityType?: string;
+  action?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type AuditEventsPage = {
+  events: AuditEvent[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export function listAuditEventsPage(userId: string, filters: AuditEventFilters = {}): Promise<AuditEventsPage> {
+  const query = new URLSearchParams();
+  if (filters.entityType) query.set("entityType", filters.entityType);
+  if (filters.action) query.set("action", filters.action);
+  if (filters.page) query.set("page", String(filters.page));
+  if (filters.pageSize) query.set("pageSize", String(filters.pageSize));
+  const queryString = query.toString();
+
+  return apiFetchWithMeta<AuditEvent[], { total: number; page: number; pageSize: number }>(
+    userId,
+    `/api/audit/events${queryString ? `?${queryString}` : ""}`,
+  ).then(({ data, meta }) => ({ events: data, total: meta.total, page: meta.page, pageSize: meta.pageSize }));
 }

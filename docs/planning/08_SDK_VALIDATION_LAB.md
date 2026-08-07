@@ -72,6 +72,12 @@ Resultado esperado:
 - banco/nivel;
 - rango.
 
+**Implementado (2026-08-07):** por cada alcance/tramo que la campaña toca se genera un caso por
+monto representativo, con una **tarjeta de prueba representativa** del `TestCard` de Fase 2 (una por
+banco; General y Amex comparten las tarjetas sin banco asociado, ya que `TestCard` no distingue esa
+diferencia hoy) — no la combinación completa de todas las tarjetas cargadas por alcance. Los
+alcances que la campaña no toca no generan casos: son idénticos al baseline en cualquier checkpoint.
+
 ## 6. Etapas obligatorias
 
 - Antes.
@@ -79,6 +85,11 @@ Resultado esperado:
 - Después, si existe retorno.
 
 Una campaña sin fecha final marca Después como `NOT_APPLICABLE` automáticamente. Cualquier otro `NOT_APPLICABLE` requiere justificación.
+
+**Implementado (2026-08-07):** "cada configuración distinta durante la campaña" se resuelve como un
+checkpoint `DURING` por cada `CampaignSegment` de la configuración (cada segmento ya es, por
+construcción, una configuración temporal distinta para su alcance) — no una fusión de puntos de
+cambio entre alcances. `src/modules/sdk-lab/domain/checkpoints.ts`, testeado.
 
 ## 7. Registro de resultado
 
@@ -106,6 +117,12 @@ Una versión está probada cuando:
 
 Editar datos relevantes invalida automáticamente los resultados.
 
+**Implementado (2026-08-07):** `GET /api/planning/campaigns/:id/test-gate` calcula este estado por
+checkpoint (`src/modules/sdk-lab/application/test-run-service.ts`, `getTestGateStatus`). Es
+**puramente informativo**: no bloquea `DRAFT→VALIDATED` (que ya tiene su propio alcance cerrado) ni
+ningún despliegue — es la base sobre la que se apoyará el gate de producción de Fase 8, que todavía
+no existe.
+
 ## 9. Cuenta sandbox
 
 La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado canónico de largo plazo. Cada ensayo:
@@ -116,7 +133,22 @@ La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado c
 - prohíbe dos ensayos simultáneos;
 - registra residuos para limpiarlos al comienzo del ensayo siguiente.
 
+**Implementado (2026-08-07):** "los planes administrados por la herramienta" se acota estrictamente a
+`RemotePlan` cuyo `Deployment.kind = TEST` — nunca planes reales importados (`origin: IMPORTED`) ni de
+un despliegue comercial real (`Deployment.kind = CANONICAL`, el planificador de Fase 6). El reset
+encola un `ExecutionRun` de `DELETE` sobre esos planes y el build uno de `CREATE` para el baseline
+completo + los tramos del checkpoint, reusando `enqueueSandboxExecutionPlan`/el worker de Fase 6 sin
+cambios; el worker es secuencial por `queuedAt`, así que el reset termina antes de que el build se
+reclame. **Pendiente:** una prueba de integración automatizada de este flujo (con un cliente Yuno
+falso, como `execution-worker.integration.ts`) — hoy solo tiene cobertura unitaria de dominio y
+verificación manual contra el dev server.
+
 ## 10. Experiencia SDK
+
+- El laboratorio inicia Lite SDK con la `checkout_session` sandbox y monta el flujo `CARD` embebido (`renderMode: element`), no modal y sin overlay de carga, con el boton de pago oculto. Tras montarlo llama a `startPayment` unicamente para abrir el formulario Lite de tarjeta y consultar BIN/cuotas; `showPayButton` sigue deshabilitado y no se implementa la creacion de pagos.
+- Lite SDK exige un callback `createPayment` para inicializarse; el laboratorio provee uno que bloquea el intento localmente y no llama a ningun servicio de pagos.
+
+- Lite SDK se carga con el paquete oficial `@yuno-payments/sdk-web`, en modo `sandbox` y con SRI. Su clave publica se entrega solo desde un endpoint autenticado de la aplicacion; el primer cargador no inicia checkout ni pagos.
 
 - SDK embebido o integrado en página aislada.
 - Selector de tarjeta de prueba y monto precargado por caso.
@@ -126,6 +158,8 @@ La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado c
 - Datos de prueba claramente identificados.
 
 ## 11. Criterios de aceptación
+
+La sesion de checkout se crea server-side mediante `GANDALF_CHECKOUT_SESSION_URL`. La URL no se expone al navegador; la respuesta se devuelve solo al usuario autorizado, sin cache, para que el inicializador del SDK pueda consumirla.
 
 - Es imposible generar un test contra producción desde UI o API.
 - Una fecha ficticia nunca modifica `CampaignVersion`.

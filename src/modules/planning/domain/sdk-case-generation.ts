@@ -31,7 +31,7 @@ export type SdkRangeSegmentCase = {
  * a mano: un tramo de un centavo (min === max) o sin lugar para un adyacente
  * (min en 0) colapsa solo, sin casos especiales explícitos.
  */
-function buildAmountCases(range: AmountRange): readonly SdkAmountCase[] {
+export function buildAmountCases(range: AmountRange): readonly SdkAmountCase[] {
   const minCents = parseAmountToCents(range.minAmount);
   const maxCents = parseAmountToCents(range.maxAmount);
 

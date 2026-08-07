@@ -1,0 +1,22 @@
+.wrap {
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+}
+
+.title {
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.description {
+  color: var(--fg-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.action {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}

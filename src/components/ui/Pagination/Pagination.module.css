@@ -1,0 +1,12 @@
+.wrap {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+.status {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}

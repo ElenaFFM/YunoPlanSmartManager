@@ -1,0 +1,56 @@
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-sunken) 25%, var(--border-subtle) 37%, var(--bg-sunken) 63%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: shimmer 1.4s ease infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.spinnerWrap {
+  align-items: center;
+  color: var(--fg-muted);
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.spinner {
+  animation: spin 0.7s linear infinite;
+  border: 2px solid var(--border-default);
+  border-radius: 999px;
+  border-top-color: var(--accent-500);
+  display: inline-block;
+  height: 1rem;
+  width: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.srOnly {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}

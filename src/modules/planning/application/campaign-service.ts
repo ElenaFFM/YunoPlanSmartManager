@@ -13,7 +13,11 @@ import {
 } from "../domain/campaign";
 import { hasBlockingErrors, type ValidationFinding } from "../domain/validation";
 import { parseCampaignSegments, serializeCampaignSegments } from "./campaign-snapshot";
-import { loadRangeIndexesByTarget } from "./scope-catalog-builder";
+import {
+  assertCampaignDoesNotOverlapValidated,
+  loadBaselineInstallmentsByTarget,
+  loadRangeIndexesByTarget,
+} from "./scope-catalog-builder";
 
 export type CampaignConfigurationInput = {
   name: string;
@@ -80,15 +84,32 @@ function toConfiguration(input: CampaignConfigurationInput): CampaignConfigurati
  */
 async function assertValidConfiguration(
   configuration: CampaignConfiguration,
+  options: { strict?: boolean } = {},
 ): Promise<readonly ValidationFinding[]> {
-  const validRangeIndexesByTarget = await loadRangeIndexesByTarget(uniqueTargets(configuration));
-  const findings = validateCampaignConfiguration(configuration, validRangeIndexesByTarget);
+  const targets = uniqueTargets(configuration);
+  const [validRangeIndexesByTarget, baselineInstallmentsByTarget] = await Promise.all([
+    loadRangeIndexesByTarget(targets),
+    loadBaselineInstallmentsByTarget(targets),
+  ]);
+  const findings = validateCampaignConfiguration(
+    configuration,
+    validRangeIndexesByTarget,
+    baselineInstallmentsByTarget,
+  );
 
-  if (hasBlockingErrors(findings)) {
-    const firstError = findings.find((finding) => finding.severity === "ERROR");
+  // Guardar un borrador solo bloquea errores; validar (options.strict) exige
+  // además resolver las advertencias — validar debe significar "sin pendientes",
+  // no solo "estructuralmente guardable".
+  const blocking = options.strict
+    ? findings.filter((finding) => finding.severity === "ERROR" || finding.severity === "WARNING")
+    : hasBlockingErrors(findings)
+      ? findings.filter((finding) => finding.severity === "ERROR")
+      : [];
+
+  if (blocking.length > 0) {
     throw new CampaignInputError(
-      firstError?.code ?? "CMP-001",
-      firstError?.message ?? "La configuración de la campaña no es válida.",
+      blocking[0].code,
+      blocking[0].message,
       400,
       findings,
     );
@@ -396,4 +417,83 @@ export async function getCampaign(campaignId: string) {
   }
 
   return campaign;
+}
+
+export type ValidateCampaignVersionInput = {
+  campaignId: string;
+  actorId: string;
+};
+
+export type ValidateCampaignVersionResult = {
+  campaign: Awaited<ReturnType<typeof getCampaign>>;
+  findings: readonly ValidationFinding[];
+};
+
+/**
+ * Pasa la versión actual de `DRAFT` a `VALIDATED`. Esto NO es el gate de
+ * producción (checklist comercial, laboratorio SDK, aprobación — Fase 7/8,
+ * todavía inexistentes): solo determina si la campaña cuenta en
+ * `buildScopeCatalog`/`effective-configuration` (que por defecto solo lee
+ * `VALIDATED`, `scope-catalog-builder.ts`) y queda protegida contra
+ * solapamientos con otras campañas `VALIDATED` sobre el mismo alcance/tramo.
+ */
+export async function validateCampaignVersion(
+  input: ValidateCampaignVersionInput,
+): Promise<ValidateCampaignVersionResult> {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: input.campaignId },
+    include: { currentVersion: true },
+  });
+
+  if (!campaign) {
+    throw new CampaignInputError("CMP-404", "La campaña indicada no existe.", 404);
+  }
+
+  const currentVersion = campaign.currentVersion;
+  if (!currentVersion) {
+    throw new CampaignInputError(
+      "CMP-500",
+      "La campaña no tiene una versión actual; requiere reconciliación manual.",
+      500,
+    );
+  }
+
+  if (currentVersion.status !== CampaignVersionStatus.DRAFT) {
+    throw new CampaignInputError(
+      "CMP-VALIDATE-001",
+      `Solo se puede validar una versión en borrador (estado actual: ${currentVersion.status}).`,
+      409,
+    );
+  }
+
+  const configuration: CampaignConfiguration = {
+    name: campaign.name,
+    description: campaign.description ?? undefined,
+    changeReason: currentVersion.changeReason,
+    segments: parseCampaignSegments(currentVersion.configurationSnapshot),
+  };
+
+  const findings = await assertValidConfiguration(configuration, { strict: true });
+
+  await assertCampaignDoesNotOverlapValidated(campaign.id, configuration);
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.campaignVersion.update({
+      where: { id: currentVersion.id },
+      data: { status: CampaignVersionStatus.VALIDATED },
+    });
+
+    await recordAuditEvent(transaction, {
+      actorId: input.actorId,
+      action: "campaign.version.validate",
+      entityType: "CampaignVersion",
+      entityId: currentVersion.id,
+      metadata: {
+        campaignId: campaign.id,
+        versionNumber: currentVersion.versionNumber,
+      },
+    });
+  });
+
+  return { campaign: await getCampaign(campaign.id), findings };
 }

@@ -1,5 +1,5 @@
 import { computeCanonicalHash } from "./canonical-hash.ts";
-import type { InstallmentTransformation } from "./installments.ts";
+import { applyInstallmentTransformation, type InstallmentSet, type InstallmentTransformation } from "./installments.ts";
 import type { TemporalRule } from "./timeline.ts";
 import type { ValidationFinding } from "./validation.ts";
 
@@ -57,16 +57,24 @@ function windowsOverlap(left: CampaignSegment, right: CampaignSegment): boolean 
 export type TargetRangeIndexes = ReadonlyMap<string, readonly number[]>;
 
 /**
+ * Set de cuotas vigente antes de la campaña, por alcance y tramo. Clave externa
+ * `campaignTargetKey(target)`, clave interna `rangeIndex`. Se usa para CMP-013:
+ * sin esto no hay forma de saber si una transformación cambia algo de verdad.
+ */
+export type TargetRangeBaselines = ReadonlyMap<string, ReadonlyMap<number, InstallmentSet>>;
+
+/**
  * Valida una configuración de campaña según 14_VALIDATION_CATALOG.md §3.
  *
- * Cubre CMP-001 a CMP-007. Quedan fuera, por depender de datos que el dominio
- * todavía no recibe: CMP-008/CMP-009 (baseline proyectado anterior y posterior)
- * y CMP-012 (patrón histórico). CMP-010 ya está garantizado por construcción en
- * `installments.ts`, que nunca inventa cuotas intermedias.
+ * Cubre CMP-001 a CMP-007 y CMP-013. Quedan fuera, por depender de datos que el
+ * dominio todavía no recibe: CMP-008/CMP-009 (baseline proyectado anterior y
+ * posterior) y CMP-012 (patrón histórico). CMP-010 ya está garantizado por
+ * construcción en `installments.ts`, que nunca inventa cuotas intermedias.
  */
 export function validateCampaignConfiguration(
   configuration: CampaignConfiguration,
   validRangeIndexesByTarget?: TargetRangeIndexes,
+  baselineInstallmentsByTarget?: TargetRangeBaselines,
 ): readonly ValidationFinding[] {
   const findings: ValidationFinding[] = [];
 
@@ -172,6 +180,20 @@ export function validateCampaignConfiguration(
           field: `segments.${segment.id}.rangeChanges`,
         });
       }
+
+      const baseline = baselineInstallmentsByTarget
+        ?.get(campaignTargetKey(segment.target))
+        ?.get(rangeChange.rangeIndex);
+      if (baseline && isNoOpTransformation(baseline, rangeChange.transformation)) {
+        findings.push({
+          code: "CMP-013",
+          severity: "WARNING",
+          message:
+            `El alcance "${campaignTargetKey(segment.target)}" tramo ${rangeChange.rangeIndex}: la ` +
+            `transformación no cambia el set de cuotas vigente (${baseline.join(", ")}).`,
+          field: `segments.${segment.id}.rangeChanges`,
+        });
+      }
     }
   }
 
@@ -213,6 +235,21 @@ function findOverlappingSegments(
   }
 
   return findings;
+}
+
+/**
+ * CMP-013: aplica la transformación y compara contra el baseline (ambos
+ * ordenados igual por `createInstallmentSet`). `RESTORE_BASELINE` queda afuera
+ * a propósito: por definición siempre coincide con el baseline pasado, y ese
+ * "no cambia nada" es exactamente su propósito, no un error de carga.
+ */
+function isNoOpTransformation(
+  baseline: InstallmentSet,
+  transformation: InstallmentTransformation,
+): boolean {
+  if (transformation.type === "RESTORE_BASELINE") return false;
+  const result = applyInstallmentTransformation(baseline, transformation);
+  return result.length === baseline.length && result.every((value, index) => value === baseline[index]);
 }
 
 function sortedDescending(values: readonly number[]): readonly number[] {

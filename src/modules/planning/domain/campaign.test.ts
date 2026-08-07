@@ -213,6 +213,73 @@ describe("validateCampaignConfiguration", () => {
 
     assert.deepEqual(validateCampaignConfiguration(configuration, validRangeIndexes), []);
   });
+
+  it("CMP-013: advierte cuando capar a un máximo por encima del baseline no cambia nada", () => {
+    const configuration: CampaignConfiguration = {
+      name: "Capar a 24",
+      changeReason: "Prueba",
+      segments: [
+        {
+          id: "seg-bna",
+          target: { type: "BANK", bankId: "bna" },
+          startAt: START,
+          endAt: END,
+          rangeChanges: [{ rangeIndex: 1, transformation: { type: "CAP_MAX_INSTALLMENT", maximum: 24 } }],
+        },
+      ],
+    };
+    const baselines = new Map([
+      [
+        campaignTargetKey({ type: "BANK", bankId: "bna" }),
+        new Map([[1, createInstallmentSet([9, 6, 3, 1])]]),
+      ],
+    ]);
+
+    const findings = validateCampaignConfiguration(configuration, undefined, baselines);
+
+    assert.deepEqual(codes(findings), ["CMP-013"]);
+    assert.equal(findings[0].severity, "WARNING");
+    assert.match(findings[0].message, /no cambia el set de cuotas/);
+  });
+
+  it("CMP-013: no advierte cuando la transformación sí cambia el set de cuotas", () => {
+    const baselines = new Map([
+      [
+        campaignTargetKey({ type: "BANK", bankId: "bna" }),
+        new Map([[4, createInstallmentSet([24, 18, 12, 9, 6, 3, 1])]]),
+      ],
+    ]);
+
+    assert.deepEqual(validateCampaignConfiguration(validConfiguration(), undefined, baselines), []);
+  });
+
+  it("CMP-013: no advierte para RESTORE_BASELINE aunque coincida con el baseline por definición", () => {
+    const configuration: CampaignConfiguration = {
+      name: "Restaurar",
+      changeReason: "Prueba",
+      segments: [
+        {
+          id: "seg-bna",
+          target: { type: "BANK", bankId: "bna" },
+          startAt: START,
+          endAt: END,
+          rangeChanges: [{ rangeIndex: 1, transformation: { type: "RESTORE_BASELINE" } }],
+        },
+      ],
+    };
+    const baselines = new Map([
+      [
+        campaignTargetKey({ type: "BANK", bankId: "bna" }),
+        new Map([[1, createInstallmentSet([9, 6, 3, 1])]]),
+      ],
+    ]);
+
+    assert.deepEqual(validateCampaignConfiguration(configuration, undefined, baselines), []);
+  });
+
+  it("CMP-013: no chequea cuando no se provee el baseline", () => {
+    assert.deepEqual(validateCampaignConfiguration(validConfiguration()), []);
+  });
 });
 
 describe("classifyCampaignChange", () => {

@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Identity = {
+export type Identity = {
   id: string;
   displayName: string;
+  email: string;
   role: "VIEWER" | "OPERATOR" | "ADMIN";
 };
 
-type IdentityState =
+export type IdentityState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; identity: Identity };

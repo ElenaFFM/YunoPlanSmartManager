@@ -1,23 +1,5 @@
-import Link from "next/link";
-import { IdentityProvider } from "./identity-provider";
-import { IdentityBadge } from "./identity-badge";
+import { AppShell } from "@/components/layout";
 
 export default function CatalogLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <IdentityProvider>
-      <main>
-        <p className="eyebrow">Fase 2 · Catálogo</p>
-        <h1 style={{ fontSize: "2.2rem" }}>Catálogo comercial</h1>
-        <nav className="tabs">
-          <Link href="/catalog/bancos">Bancos y BIN/IIN</Link>
-          <Link href="/catalog/plantillas">Plantillas</Link>
-          <Link href="/catalog/tarjetas">Tarjetas de prueba</Link>
-          <Link href="/catalog/auditoria">Auditoría</Link>
-          <Link href="/planning/campanas">→ Campañas</Link>
-        </nav>
-        <IdentityBadge />
-        {children}
-      </main>
-    </IdentityProvider>
-  );
+  return <AppShell>{children}</AppShell>;
 }
