@@ -226,22 +226,25 @@ Los montos no deben almacenarse como float.
 
 - `campaignVersionId`
 - `environment`, forzado a sandbox
-- `logicalCheckpoint`
+- `logicalCheckpoint` (`BEFORE`/`DURING`/`AFTER`) y `segmentIndex` (solo para `DURING`: qué `CampaignSegment` representa)
 - `dateShiftSeconds`
-- `status`
-- `temporaryDeploymentId`
-- `startedById`, timestamps
-- `cleanupStatus`
+- `status` (`PENDING → RESETTING → BUILDING → READY → RECORDING → COMPLETED`, o `FAILED`/`ABORTED`)
+- `lockKey`, constante (`"SANDBOX:lab"`): exclusividad global de un solo ensayo a la vez
+- `testedHash`: hash canónico de la versión al momento del ensayo, para `SDK-009`
+- **Implementado con tres referencias a `ExecutionRun` en lugar de un único `temporaryDeploymentId`:** `resetRunId` (DELETE de los planes que un ensayo anterior dejó), `buildRunId` (CREATE del baseline completo + los tramos del checkpoint) y `cleanupRunId` (DELETE de limpieza al completar). Cada uno es un `ExecutionRun` real con su propio `Deployment(kind=TEST)`, encolado con la misma maquinaria de Fase 6 (`enqueueSandboxExecutionPlan`) sin modificarla.
+- `startedById`, timestamps (`startedAt`, `completedAt`)
+- `cleanupStatus` (`NOT_STARTED | CLEANED | RESIDUAL`), informativo — la limpieza nunca bloquea completar el ensayo
+- `failureReason`
 
 ### `TestCaseResult`
 
-- fase/segmento
-- banco/tarjeta/BIN
-- monto
-- cuotas esperadas
-- cuotas observadas
-- resultado: `PASSED | FAILED | NOT_APPLICABLE`
-- justificación
+- `testRunId`
+- `scope` (`AMEX | BANK | GENERAL`), `bankId` opcional, `rangeIndex`
+- `amount`, `amountLabel` (`MIN | MAX | INTERIOR | ADJACENT_BELOW_MIN | ADJACENT_ABOVE_MAX`)
+- `testCardId` opcional, hacia el catálogo `TestCard` de Fase 2: una tarjeta **representativa** por alcance (una por banco, una compartida entre General/Amex ya que `TestCard` no distingue eso), no todas las tarjetas cargadas — `SDK-004` se satisface con esa referencia
+- `expectedInstallments` (calculado server-side), `observedInstallments` (captura manual del operador)
+- `result`: `PENDING | PASSED | FAILED | NOT_APPLICABLE` — un desajuste esperado/observado siempre fuerza `FAILED` (`SDK-005`), sin importar qué pidió el operador
+- `justificación` (obligatoria si `NOT_APPLICABLE`, `SDK-006`)
 - `testedById`, `testedAt`
 
 ### `Approval`

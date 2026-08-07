@@ -72,6 +72,12 @@ Resultado esperado:
 - banco/nivel;
 - rango.
 
+**Implementado (2026-08-07):** por cada alcance/tramo que la campaña toca se genera un caso por
+monto representativo, con una **tarjeta de prueba representativa** del `TestCard` de Fase 2 (una por
+banco; General y Amex comparten las tarjetas sin banco asociado, ya que `TestCard` no distingue esa
+diferencia hoy) — no la combinación completa de todas las tarjetas cargadas por alcance. Los
+alcances que la campaña no toca no generan casos: son idénticos al baseline en cualquier checkpoint.
+
 ## 6. Etapas obligatorias
 
 - Antes.
@@ -79,6 +85,11 @@ Resultado esperado:
 - Después, si existe retorno.
 
 Una campaña sin fecha final marca Después como `NOT_APPLICABLE` automáticamente. Cualquier otro `NOT_APPLICABLE` requiere justificación.
+
+**Implementado (2026-08-07):** "cada configuración distinta durante la campaña" se resuelve como un
+checkpoint `DURING` por cada `CampaignSegment` de la configuración (cada segmento ya es, por
+construcción, una configuración temporal distinta para su alcance) — no una fusión de puntos de
+cambio entre alcances. `src/modules/sdk-lab/domain/checkpoints.ts`, testeado.
 
 ## 7. Registro de resultado
 
@@ -106,6 +117,12 @@ Una versión está probada cuando:
 
 Editar datos relevantes invalida automáticamente los resultados.
 
+**Implementado (2026-08-07):** `GET /api/planning/campaigns/:id/test-gate` calcula este estado por
+checkpoint (`src/modules/sdk-lab/application/test-run-service.ts`, `getTestGateStatus`). Es
+**puramente informativo**: no bloquea `DRAFT→VALIDATED` (que ya tiene su propio alcance cerrado) ni
+ningún despliegue — es la base sobre la que se apoyará el gate de producción de Fase 8, que todavía
+no existe.
+
 ## 9. Cuenta sandbox
 
 La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado canónico de largo plazo. Cada ensayo:
@@ -115,6 +132,16 @@ La cuenta sandbox es exclusiva de pruebas y descartable. No conserva un estado c
 - instala un baseline conocido en orden determinista;
 - prohíbe dos ensayos simultáneos;
 - registra residuos para limpiarlos al comienzo del ensayo siguiente.
+
+**Implementado (2026-08-07):** "los planes administrados por la herramienta" se acota estrictamente a
+`RemotePlan` cuyo `Deployment.kind = TEST` — nunca planes reales importados (`origin: IMPORTED`) ni de
+un despliegue comercial real (`Deployment.kind = CANONICAL`, el planificador de Fase 6). El reset
+encola un `ExecutionRun` de `DELETE` sobre esos planes y el build uno de `CREATE` para el baseline
+completo + los tramos del checkpoint, reusando `enqueueSandboxExecutionPlan`/el worker de Fase 6 sin
+cambios; el worker es secuencial por `queuedAt`, así que el reset termina antes de que el build se
+reclame. **Pendiente:** una prueba de integración automatizada de este flujo (con un cliente Yuno
+falso, como `execution-worker.integration.ts`) — hoy solo tiene cobertura unitaria de dominio y
+verificación manual contra el dev server.
 
 ## 10. Experiencia SDK
 
