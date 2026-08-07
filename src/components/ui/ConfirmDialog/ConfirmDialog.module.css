@@ -1,0 +1,20 @@
+.description {
+  color: var(--fg-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+.field textarea,
+.field input {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-base);
+  padding: 0.5rem var(--space-3);
+}

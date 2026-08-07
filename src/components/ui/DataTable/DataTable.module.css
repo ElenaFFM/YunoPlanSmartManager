@@ -1,0 +1,43 @@
+.wrap {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  width: 100%;
+}
+
+.caption {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.table th {
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-default);
+  font-weight: var(--weight-bold);
+  padding: var(--space-2) var(--space-3);
+  position: sticky;
+  text-align: left;
+  top: 0;
+}
+
+.table td {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-2) var(--space-3);
+  vertical-align: top;
+}
+
+.alignRight {
+  text-align: right;
+}

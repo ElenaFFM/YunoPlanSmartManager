@@ -8,7 +8,9 @@ Este documento es la fuente única de verdad del sistema de diseño del rediseñ
 
 **Etapa 2 (AppShell + navegación + notificaciones base) cerrada** — primer cambio visual real, verificado en vivo contra el dev server (bancos, auditoría, campañas) sin errores de consola, más typecheck/lint/149 tests/build en verde. Sidebar con 4 grupos (Operación/Catálogo/Verificación/Sistema) reemplaza los tabs duplicados de `catalog/layout.tsx`/`planning/layout.tsx`; las secciones todavía no construidas (Inicio, Calendario, Línea de tiempo, Ejecuciones, Aprobaciones, Administración) aparecen deshabilitadas con la etiqueta "Próximamente" en vez de estar ausentes, para que el alcance completo sea visible desde ahora. Topbar con indicador de ambiente (Sandbox/Producción, antes invisible en toda la app — requirió el endpoint nuevo `GET /api/environment`) e identidad. `IdentityProvider`/`IdentityBadge` movidos a `src/components/identity/`. Responsive: sidebar colapsa a drawer bajo 60rem.
 
-**Etapa 3 (kit de UI completo) es la siguiente.**
+**Etapa 3 (kit de UI completo) cerrada** — verificado en vivo en `/dev/ui` (interacción real: ConfirmDialog con confirmación reforzada, cambio de tabs) más typecheck/lint/149 tests/build en verde.
+
+**Etapa 4 (piloto: Auditoría) es la siguiente.**
 
 ## AppShell y navegación
 
@@ -87,7 +89,13 @@ Capa de acceso a la API unificada en `src/lib/api/`:
 
 ## Inventario de componentes
 
-Pendiente — se completa en la Etapa 3 (`src/components/ui/**`).
+Todos en `src/components/ui/**`, cada uno con su propio `.module.css`, exportados desde `src/components/ui/index.ts`:
+
+`Button` (primary/secondary/ghost/danger, loading, iconOnly) · `Badge` / `StatusBadge` (fuente única tono+etiqueta, resuelve la colisión de namespace de `status-${x.toLowerCase()}`) · `Alert` (usado en niveles 3 y 4 de notificación) · `Stack`/`Row`/`Grid` · `Card`/`CardHeader`/`CardBody`/`CardFooter`/`CardGrid` · `DataTable` (header sticky, `<caption>`, `scope="col"`, alineación numérica) · `Pagination` · `Toolbar` · `DefinitionList` · `EmptyState` · `Skeleton`/`Spinner` · `AsyncBoundary` (los 4 estados loading/error/empty/ready) · `Stepper` · `ProgressList` (`aria-live`) · `CodeBlock`/`JsonViewer` (render seguro de payloads, texto nunca interpretado como markup) · `Disclosure` (sobre `<details>`) · `Modal` (sobre `<dialog>` nativo) · `ConfirmDialog` (motivo obligatorio opcional, confirmación reforzada con texto tipeado) · `Tabs` (accesible, navegación con flechas).
+
+Catálogo vivo en `/dev/ui` (`src/app/dev/ui/`), gated a `development`/`test` igual que `/api/dev/identity` — no existe en otros ambientes. No hay Storybook: usa los componentes reales, así que no puede desincronizarse.
+
+Deliberadamente afuera del kit: `Tooltip` (la información no puede depender de un hover, `04_UX_AND_WORKFLOWS.md` §10) y cualquier combobox/date-picker/multiselect custom — se limita a controles nativos (`select`, `input`, `details`) hasta que aparezca un requisito genuino que justifique una dependencia puntual.
 
 ## Mapa enum → etiqueta es-AR
 
